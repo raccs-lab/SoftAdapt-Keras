@@ -28,6 +28,16 @@ Once the files are available, make sure to be in the same directory as `setup.py
 pip install -e .
 ````
 
+### Running Tests
+```bash
+uv tool run --with '.[test]' pytest
+```
+
+with coverage
+```bash
+uv tool run --with '.[test]' --with pytest-cov pytest
+```
+
 ## General Usage and Examples
 
 SoftAdapt consists of three variants. These variants are the "original" `SoftAdapt`, `NormalizedSoftAdapt`, and `LossWeightedSoftAdapt`. Below, we discuss the logic of SoftAdapt and provide some simple examples for calculating SoftAdapt weights.
