@@ -1,5 +1,8 @@
 [![Tests Status](./reports/junit/junit-badge.svg?dummy=8484744)](./reports/junit/report.html)
 
+![coverage](https://gitlab.com/raccs-lab/auramask-library/badges/main/coverage.svg?job=coverage)
+
+
 # SoftAdapt
 
 This repository contains an updated implementation of the [SoftAdapt algorithm](https://arxiv.org/pdf/1912.12355.pdf)(techniques for adaptive loss balancing of multi-tasking neural networks). Since 2020 (when SoftAdapt was first published), SoftAdapt has been applied to a variety of applications, ranging from generative models (e.g. these papers for [VAEs](https://arxiv.org/abs/2009.11693) and [GANs](https://www.sciencedirect.com/science/article/pii/S0167739X2100488X)), [model compression](https://arxiv.org/abs/2012.01604), and [Physics Informed Neural Networks](https://arxiv.org/pdf/2211.16753.pdf), to name a few.

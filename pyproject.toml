@@ -27,12 +27,19 @@ keywords = [
 ]
 dependencies = ["findiff>=0.12.1", "keras>=3.12.0", "numpy>=2.2.6"]
 
+[build-system]
+requires = ["uv_build>=0.9.10,<0.10.0"]
+build-backend = "uv_build"
+
 [project.urls]
 Homepage = "https://gitlab.com/raccs-lab/auramask-library/SoftAdapt-Keras"
 Issues = "https://gitlab.com/raccs-lab/auramask-library/SoftAdapt-Keras/-/issues"
 
 [project.optional-dependencies]
-test = ["tensorflow>=2.20.0"]
+test = ["keras>=3.12.0", "torch>=2.9.1"]
 
 [tool.pytest.ini_options]
-addopts = "--cov=softadapt"
+addopts = "--cov=softadapt --cov-report term"
+
+[tool.coverage.run]
+relative_files = true
