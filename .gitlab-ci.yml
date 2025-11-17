@@ -1,45 +1,57 @@
-# This file is a template, and might need editing before it works on your project.
-# This is a sample GitLab CI/CD configuration file that should run without any modifications.
-# It demonstrates a basic 3 stage CI/CD pipeline. Instead of real tests or scripts,
-# it uses echo commands to simulate the pipeline execution.
-#
-# A pipeline is composed of independent jobs that run scripts, grouped into stages.
-# Stages run in sequential order, but jobs within stages run in parallel.
-#
-# For more information, see: https://docs.gitlab.com/ee/ci/yaml/#stages
-#
-# You can copy and paste this template into a new `.gitlab-ci.yml` file.
-# You should not add this template to an existing `.gitlab-ci.yml` file by using the `include:` keyword.
-#
-# To contribute improvements to CI/CD templates, please follow the Development guide at:
-# https://docs.gitlab.com/development/cicd/templates/
-# This specific template is located at:
-# https://gitlab.com/gitlab-org/gitlab/-/blob/master/lib/gitlab/ci/templates/Getting-Started.gitlab-ci.yml
-include:
-  - component: $CI_SERVER_FQDN/swepy/cicd-templates/uv-build/uv-build@0.2.0
-    inputs:
-        stage: build
-        src: src/
-  - component: $CI_SERVER_FQDN/swepy/cicd-templates/pytest/pytest@2.1.1
-    inputs:
-        stage: test
+# stages:
+#   - build
+#   - test
+#   - deploy
+#   - .post
 
+variables:
+  UV_VERSION: "0.9"
+  PYTHON_VERSION: "3.12"
+  BASE_LAYER: bookworm-slim
+  UV_LINK_MODE: copy
+  UV_CACHE_DIR: .uv-cache
+  KERAS_BACKEND: "torch"
 
-stages:          # List of stages for jobs, and their order of execution
-  - build
-  - test
-  - deploy
+default:
+  image: ghcr.io/astral-sh/uv:$UV_VERSION-python$PYTHON_VERSION-$BASE_LAYER
+  cache:
+    - key:
+        files:
+          - uv.lock
+      paths:
+        - $UV_CACHE_DIR
 
-lint-test-job:   # This job also runs in the test stage.
-  stage: test    # It can run at the same time as unit-test-job (in parallel).
+uv-build:
+  stage: build
   script:
-    - echo "Linting code... This will take about 10 seconds."
-    - sleep 10
-    - echo "No lint issues found."
+    - uv build
+  artifacts:
+    paths:
+      - "dist/"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'  # Run for all changes to a merge request's source branch
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH       # Run for all changes to the default branch
 
-deploy-job:      # This job runs in the deploy stage.
-  stage: deploy  # It only runs when *both* jobs in the test stage complete successfully.
-  environment: production
+unittest:
+  stage: test
   script:
-    - echo "Deploying application..."
-    - echo "Application successfully deployed."
+    - uv run --with pytest --with keras --with torch --with pytest_cov pytest --cov-report=xml:cov.xml --junitxml=report.xml
+  variables:
+    UV_INDEX: "pytorch=https://download.pytorch.org/whl/cpu uv lock"
+  coverage: '/TOTAL.*? (100(?:\.0+)?\%\\|[1-9]?\d(?:\.\d+)?\%)$/'
+  artifacts:
+    reports:
+      junit: report.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: cov.xml
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'  # Run for all changes to a merge request's source branch
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH       # Run for all changes to the default branch
+
+post-step:
+  stage: .post
+  script:
+    - uv cache prune --ci
+  rules:
+    - when: always
