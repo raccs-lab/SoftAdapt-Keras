@@ -1,7 +1,5 @@
-[![Tests Status](./reports/junit/junit-badge.svg?dummy=8484744)](./reports/junit/report.html)
-
-![coverage](https://gitlab.com/raccs-lab/auramask-library/badges/main/coverage.svg?job=coverage)
-
+[![Latest Release](https://gitlab.com/raccs-lab/auramask-library/SoftAdapt-Keras/-/badges/release.svg)](https://gitlab.com/raccs-lab/auramask-library/SoftAdapt-Keras/-/releases) [![coverage report](https://gitlab.com/raccs-lab/auramask-library/SoftAdapt-Keras/badges/main/coverage.svg)](https://gitlab.com/raccs-lab/auramask-library/SoftAdapt-Keras/-/commits/main) [![arXiv:10.48550/arXiv.1912.12355](http://img.shields.io/badge/arXiv-110.48550/arXiv.2206.04047-A42C25.svg)](
+https://doi.org/10.48550/arXiv.1912.12355)
 
 # SoftAdapt
 
@@ -9,36 +7,26 @@ This repository contains an updated implementation of the [SoftAdapt algorithm](
 
 **SoftAdapt is also available within [NVIDIA's Modulus](https://docs.nvidia.com/deeplearning/modulus/modulus-v2209/user_guide/theory/advanced_schemes.html#:~:text=annular%20ring%20example.-,SoftAdapt,-Softadapt%20is%20a). [Modulus](https://developer.nvidia.com/modulus) is a an open-source framework for building, training, and fine-tuning Physics-based DL models in Python.**
 
-[![arXiv:10.48550/arXiv.1912.12355](http://img.shields.io/badge/arXiv-110.48550/arXiv.2206.04047-A42C25.svg)](
-https://doi.org/10.48550/arXiv.1912.12355)
 
 ## Installing SoftAdapt
-### Installing the GitHub Repository (Recommended)
+### Installing the Repository
 SoftAdapt can be installed using PyPI:
-```
-$ pip install git+https://github.com/dr-aheydari/SoftAdapt.git
-```
-or can be first cloned and then installed as the following:
-```
-$ git clone https://github.com/dr-aheydari/SoftAdapt.git
-$ pip install ./SoftAdapt
+``` bash
+git clone https://github.com/raccs-lab/auramask-library/SoftAdapt-Keras.git
+cd SoftAdapt-Keras
+uv add .
 ```
 
 ### Install Package Locally with `pip`
 Once the files are available, make sure to be in the same directory as `setup.py`. Then, using `pip`, run:
 
-````bash
+```bash
 pip install -e .
 ````
 
 ### Running Tests
 ```bash
 uv tool run --with '.[test]' pytest
-```
-
-with coverage
-```bash
-uv tool run --with '.[test]' --with pytest-cov pytest
 ```
 
 ## General Usage and Examples
