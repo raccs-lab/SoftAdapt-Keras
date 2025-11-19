@@ -1,9 +1,0 @@
-site_name: Keras SoftAdapt
-nav:
-  - Home: index.md
-  - About: about.md
-  - SoftAdapt: algorithms.md
-  - Keras: keras.md
-plugins:
-  - mkdocstrings:
-      default_handler: python
