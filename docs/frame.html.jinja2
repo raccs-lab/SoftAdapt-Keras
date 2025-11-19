@@ -1,0 +1,78 @@
+{# Base Markdown Documentation Template #}
+{% macro render_signature(obj) %}
+`{{ obj.name }}{% if obj.args %}({{ obj.args }}){% endif %}`
+{% endmacro %}
+
+{% macro render_inheritance(obj) %}
+{% if obj.bases %}
+**Inherits from:**
+{% for base in obj.bases %}
+- `{{ base }}`
+{% endfor %}
+{% endif %}
+{% endmacro %}
+
+{% macro render_docstring(obj) %}
+{% if obj.docstring %}
+{{ obj.docstring | trim }}
+{% endif %}
+{% endmacro %}
+
+# {{ module.name }} Module Documentation
+
+## Overview
+{{ render_docstring(module) }}
+
+{% if module.submodules %}
+## Submodules
+{% for submodule in module.submodules %}
+- `{{ submodule.name }}`
+{% endfor %}
+{% endif %}
+
+## Classes
+
+{% for class in module.classes %}
+### {{ class.name }}
+
+#### Signature
+{{ render_signature(class) }}
+
+{{ render_inheritance(class) }}
+
+#### Description
+{{ render_docstring(class) }}
+
+{% if class.methods %}
+#### Methods
+{% for method in class.methods %}
+##### `{{ method.name }}({{ method.args }})`
+{{ render_docstring(method) }}
+
+{% endfor %}
+{% endif %}
+
+{% endfor %}
+
+## Functions
+
+{% for function in module.functions %}
+### `{{ function.name }}({{ function.args }})`
+
+{{ render_docstring(function) }}
+
+{% endfor %}
+
+## Variables
+
+{% for variable in module.variables %}
+### `{{ variable.name }}`
+**Type:** `{{ variable.type }}`
+
+{{ render_docstring(variable) }}
+
+{% endfor %}
+
+---
+
+*Automatically generated documentation*

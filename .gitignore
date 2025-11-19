@@ -131,3 +131,5 @@ dmypy.json
 
 .ruff_cache
 .gitlab-ci-local
+docs/**/*.md
+.gitlab-ci-local-variables.yml

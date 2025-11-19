@@ -25,7 +25,7 @@ keywords = [
     "Adaptive-Weighting, Multi-Task-Nerual-Networks Optimization",
     "Gradient-Descent-Weighting, Machine Learning",
 ]
-dependencies = ["findiff>=0.12.1", "keras>=3.12.0", "numpy>=2.2.6"]
+dependencies = ["findiff>=0.12.1", "keras>=3.12.0"]
 
 [build-system]
 requires = ["uv_build>=0.9.10,<0.10.0"]
@@ -35,11 +35,21 @@ build-backend = "uv_build"
 Homepage = "https://gitlab.com/raccs-lab/auramask-library/SoftAdapt-Keras"
 Issues = "https://gitlab.com/raccs-lab/auramask-library/SoftAdapt-Keras/-/issues"
 
-[project.optional-dependencies]
-test = ["keras>=3.12.0", "torch>=2.9.1"]
-
 [tool.pytest.ini_options]
 addopts = "--cov=softadapt --cov-report term"
 
 [tool.coverage.run]
 relative_files = true
+
+[dependency-groups]
+dev = ["torch>=2.9.1"]
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch", marker = "platform_system == 'Linux'" }
+]
+
+[[tool.uv.index]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
