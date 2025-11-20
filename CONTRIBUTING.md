@@ -19,6 +19,20 @@ Thank you for considering contributing to the softadapt package! Your contributi
     ```bash
     KERAS_BACKEND=torch uv run --with pytest pytest
     ```
+5. **Commit Styles**: Commits must follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) format, checked with a `pre-commit` rule. For ease of use, use the `cz` command:
+    1. Tool installation:
+        ```bash
+        uv tool install commitizen
+        ```
+    2. Usage
+        ```bash
+        cz c
+        ```
+        or 
+        ```bash
+        cz c -- -S
+        ```
+        to sign a commit.
 5. **Submit Pull Request**: Push your changes to your fork and create a pull request.
 
 ## Submission Guidelines
