@@ -16,10 +16,10 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-from typing import Literal
+from typing import Literal, NoReturn
 
 import numpy as np
-from keras import KerasTensor, backend, callbacks, ops
+from keras import KerasTensor, backend as K, callbacks, ops
 from keras.src.utils import file_utils
 
 from softadapt.algorithms import (
@@ -33,28 +33,28 @@ class AdaptiveLossCallback(callbacks.Callback):
     """Keras callback for use of SoftAdapt within the Keras machine learning framework.
 
     Attributes:
-        components (list[str]): _description_
-        weights (list[float]): _description_
-        frequency (Literal["epoch", "batch"] | int, optional): _description_. Defaults to "epoch".
-        beta (float, optional): _description_. Defaults to 0.1.
-        accuracy_order (int | None, optional): _description_. Defaults to None.
-        algorithm (Literal["loss-weighted", "normalized", "base"], optional): _description_. Defaults to "base".
-        backup_dir (str | None, optional): _description_. Defaults to None.
-        calculate_on_validation (bool, optional): _description_. Defaults to False.
+        components (list[str]): Name of each loss component
+        weights (list[float]): Starting weights of loss components
+        frequency (Literal["epoch", "batch"] | int, optional): How often to update loss weighting. Defaults to "epoch".
+        beta (float, optional): A float which is the scaling factor (as described in the manuscript). Defaults to 0.1.
+        accuracy_order (int | None, optional): An integer indicating the accuracy order of the finite volume approximation of each loss component's slope. Defaults to None.
+        algorithm (Literal["loss-weighted", "normalized", "base"], optional): SoftAdapt algorithm variant to use. Defaults to "base".
+        backup_dir (str | None, optional): Directory to save loss weighting for stopped or interrupted training jobs. Defaults to None.
+        calculate_on_validation (bool, optional): Calculate weights based on validation data, default (False) computes based on training data. Defaults to False.
     """
 
     def __init__(
         self,
         components: list[str],
-        weights: list[float],
         frequency: Literal["epoch", "batch"] | int = "epoch",
         beta: float = 0.1,
         accuracy_order: int | None = None,
         algorithm: Literal["loss-weighted", "normalized", "base"] = "base",
         backup_dir: str | None = None,
-        *,
         calculate_on_validation: bool = False,
+        clip_weights: bool = False,
     ):
+        super().__init__()
         if algorithm == "base":
             self.algorithm = SoftAdapt(beta=beta, accuracy_order=accuracy_order)
         elif algorithm == "loss-weighted":
@@ -67,11 +67,11 @@ class AdaptiveLossCallback(callbacks.Callback):
             )
 
         self.frequency = frequency
-        self.order = components
-        self._weights = weights
+        self.order = [f"{component}_loss" for component in components]
         self.components_history: list[KerasTensor] = [[] for _ in components]
         self.debug = False
         self.val = calculate_on_validation
+        self.clip_weights = clip_weights
         if backup_dir:
             self.backup_dir = backup_dir
             self._component_history_path = file_utils.join(
@@ -86,14 +86,49 @@ class AdaptiveLossCallback(callbacks.Callback):
 
     @property
     def weights(self) -> list[float]:
-        return self._weights
+        """Getter for model weights
+
+        Returns:
+            list[float]: list of updated weights
+        """
+        if hasattr(self.model, "loss_weights"):
+            return self.model.loss_weights
+        elif hasattr(self.model, "_compile_loss"):
+            return [
+                loss_tuple[2] for loss_tuple in self.model._compile_loss._flat_losses
+            ]
 
     @weights.setter
-    def weights(self, value):
-        self._weights = value
+    def weights(self, value: list[float]) -> NoReturn:
+        """Setter for adaptive weights
+
+        Args:
+            value (list): List containing values for the weights.
+
+        Returns:
+            NoReturn: Does not return a value
+        """
+        if self.clip_weights:
+            new_losses = [
+                ops.maximum(w, K.epsilon()) for w in value
+            ]  # Clip weights to avoid going below 0
+        else:
+            new_losses = value
+
+        if hasattr(self.model, "loss_weights"):
+            self.model.loss_weights = new_losses
+        elif hasattr(self.model, "_compile_loss"):
+            flat_losses = self.model._compile_loss._flat_losses
+            for i in range(len(flat_losses)):
+                flat_losses[i] = flat_losses[i][:2] + (value[i],) + flat_losses[i][3:]
 
     def on_train_begin(self, logs: dict | None = None):
-        """Get adaptive loss state from temporary file and restore it."""
+        """Get adaptive loss state from temporary file and restore it.
+
+
+        Args:
+            logs (dict | None, optional): dictionary of computed losses. Defaults to None.
+        """
         if self.backup_dir is not None:
             if file_utils.exists(self._component_history_path):
                 saved_history = np.load(self._component_history_path)
@@ -107,6 +142,12 @@ class AdaptiveLossCallback(callbacks.Callback):
         return super().on_train_begin(logs)
 
     def on_epoch_end(self, epoch: int, logs: dict | None = None):
+        """Update component history in order for weight computation.
+
+        Args:
+            epoch (int): Current epoch.
+            logs (dict | None, optional): Computed loss values logs indexed by loss name. Defaults to None.
+        """
         # Update component history in order for weight computation
         if self.val:
             for k in self.order:
@@ -124,11 +165,11 @@ class AdaptiveLossCallback(callbacks.Callback):
             and len(self.components_history[0]) > 1
         ):
             adapt_weights = self.algorithm.get_component_weights(
-                *ops.convert_to_tensor(self.components_history, dtype=backend.floatx()),
+                *ops.convert_to_tensor(self.components_history, dtype=K.floatx()),
                 verbose=self.debug,
             )
 
-            self.weights = ops.cast(adapt_weights, backend.floatx())
+            self.weights = ops.cast(adapt_weights, K.floatx())
 
             for h in self.components_history:
                 if (

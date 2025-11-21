@@ -1,3 +1,4 @@
+default_install_hook_types: [pre-commit,pre-push,commit-msg]
 repos:
 # Codespell for common misspellings
 - repo: https://github.com/codespell-project/codespell
@@ -10,7 +11,7 @@ repos:
       stages: [pre-commit]
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.11.7
+  rev: v0.14.5
   hooks:
     # Run the linter.
     - id: ruff
@@ -19,3 +20,8 @@ repos:
     # Run the formatter.
     - id: ruff-format
       types_or: [ python, pyi, jupyter ]
+- repo: https://github.com/commitizen-tools/commitizen
+  rev: v4.10.0
+  hooks:
+    - id: commitizen
+      stages: [commit-msg]
