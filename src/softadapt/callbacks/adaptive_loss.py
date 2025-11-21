@@ -16,7 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-from typing import Literal
+from typing import Literal, NoReturn
 
 import numpy as np
 from keras import KerasTensor, backend as K, callbacks, ops
@@ -46,7 +46,6 @@ class AdaptiveLossCallback(callbacks.Callback):
     def __init__(
         self,
         components: list[str],
-        weights: list[float],
         frequency: Literal["epoch", "batch"] | int = "epoch",
         beta: float = 0.1,
         accuracy_order: int | None = None,
@@ -68,11 +67,11 @@ class AdaptiveLossCallback(callbacks.Callback):
             )
 
         self.frequency = frequency
-        self.order = components
-        self._weights = weights
+        self.order = [f"{component}_loss" for component in components]
         self.components_history: list[KerasTensor] = [[] for _ in components]
         self.debug = False
         self.val = calculate_on_validation
+        self.clip_weights = clip_weights
         if backup_dir:
             self.backup_dir = backup_dir
             self._component_history_path = file_utils.join(
@@ -92,21 +91,36 @@ class AdaptiveLossCallback(callbacks.Callback):
         Returns:
             list[float]: list of updated weights
         """
-        return self.model.loss_weights
+        if hasattr(self.model, "loss_weights"):
+            return self.model.loss_weights
+        elif hasattr(self.model, "_compile_loss"):
+            return [
+                loss_tuple[2] for loss_tuple in self.model._compile_loss._flat_losses
+            ]
 
     @weights.setter
-    def weights(self, value):
+    def weights(self, value: list[float]) -> NoReturn:
         """Setter for adaptive weights
 
         Args:
-            value (_type_): New value for the weights.
+            value (list): List containing values for the weights.
+
+        Returns:
+            NoReturn: Does not return a value
         """
         if self.clip_weights:
-            self.model.loss_weights = [
+            new_losses = [
                 ops.maximum(w, K.epsilon()) for w in value
             ]  # Clip weights to avoid going below 0
         else:
-            self.model.loss_weights = value
+            new_losses = value
+
+        if hasattr(self.model, "loss_weights"):
+            self.model.loss_weights = new_losses
+        elif hasattr(self.model, "_compile_loss"):
+            flat_losses = self.model._compile_loss._flat_losses
+            for i in range(len(flat_losses)):
+                flat_losses[i] = flat_losses[i][:2] + (value[i],) + flat_losses[i][3:]
 
     def on_train_begin(self, logs: dict | None = None):
         """Get adaptive loss state from temporary file and restore it.

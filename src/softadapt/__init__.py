@@ -16,7 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-from softadapt import callbacks as callbacks
+from softadapt.callbacks import AdaptiveLossCallback as AdaptiveLossCallback
 
 from softadapt import algorithms as algorithms
 from softadapt.algorithms import (
