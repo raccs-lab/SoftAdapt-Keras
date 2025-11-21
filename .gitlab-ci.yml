@@ -20,9 +20,9 @@ default:
           - uv.lock
       paths:
         - $UV_CACHE_DIR
-  # rules:
-  #   - if: $CI_PIPELINE_SOURCE == 'merge_request_event'  # Run for all changes to a merge request's source branch
-  #   - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH       # Run for all changes to the default branch
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'  # Run for all changes to a merge request's source branch
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH       # Run for all changes to the default branch
 
 package-build:
   stage: build
@@ -82,5 +82,5 @@ deploy-docs:
     - git -C ${CI_PROJECT_NAME}.wiki config user.email "$GITLAB_USER_EMAIL"
     - cp -r ${CI_PROJECT_NAME}/docs/* ${CI_PROJECT_NAME}.wiki
     - '[ -z "$(git -C ${CI_PROJECT_NAME}.wiki status --porcelain)" ] && exit 0'
-    # - git -C ${CI_PROJECT_NAME}.wiki add .
-    # - git -C ${CI_PROJECT_NAME}.wiki commit -am "Updated triggered from $CI_COMMIT_SHORT_SHA $CI_COMMIT_MESSAGE" && git -C ${CI_PROJECT_NAME}.wiki push origin master || true
+    - git -C ${CI_PROJECT_NAME}.wiki add .
+    - git -C ${CI_PROJECT_NAME}.wiki commit -am "Updated triggered from $CI_COMMIT_SHORT_SHA $CI_COMMIT_MESSAGE" && git -C ${CI_PROJECT_NAME}.wiki push origin master || true
