@@ -126,6 +126,6 @@ deploy-changelog:
     - '[ -z "$(git status --porcelain)" ] && exit 0'
     - git add CHANGELOG.md
     - 'git commit --no-verify -m "docs(CHANGELOG.md): refresh changelog with new commits from $CI_COMMIT_SHORT_SHA"'
-    - git push $CI_REPOSITORY_URL
+    - git push $CI_REPOSITORY_URL HEAD:main
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
