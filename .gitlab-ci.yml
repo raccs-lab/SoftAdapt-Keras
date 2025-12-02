@@ -21,21 +21,22 @@ default:
       paths:
         - $UV_CACHE_DIR
 
-# build-changelog:
-#   stage: build
-#   image:
-#     name: orhunp/git-cliff:latest
-#     entrypoint: [""]
-#   variables:
-#     GIT_STRATEGY: clone
-#     GIT_DEPTH: 0
-#   script:
-#     - git-cliff -r . > CHANGELOG.md
-#   artifacts:
-#     paths:
-#       - CHANGELOG.md
-#   rules:
-#     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+build-changelog:
+  stage: build
+  image:
+    name: orhunp/git-cliff:latest
+    entrypoint: [""]
+  variables:
+    GIT_STRATEGY: clone # clone entire repo instead of reusing workspace
+    GIT_DEPTH: 0 # avoid shallow clone to give cliff all the info it needs
+  script:
+    - git-cliff -r . > CHANGELOG.md
+  artifacts:
+    expose_as: 'CHANGELOG'
+    paths:
+      - CHANGELOG.md
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'  # Run for all changes to a merge request's source branch
 
 build-package:
   stage: build
@@ -84,6 +85,7 @@ test-package:
       changes:
         - src/softadapt/**/*
         - tests/**/*
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 deploy-docs:
   stage: deploy
