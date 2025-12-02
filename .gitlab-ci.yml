@@ -21,21 +21,21 @@ default:
       paths:
         - $UV_CACHE_DIR
 
-build-changelog:
-  stage: build
-  image:
-    name: orhunp/git-cliff:latest
-    entrypoint: [""]
-  variables:
-    GIT_STRATEGY: clone
-    GIT_DEPTH: 0
-  script:
-    - git-cliff -r . > CHANGELOG.md
-  artifacts:
-    paths:
-      - CHANGELOG.md
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+# build-changelog:
+#   stage: build
+#   image:
+#     name: orhunp/git-cliff:latest
+#     entrypoint: [""]
+#   variables:
+#     GIT_STRATEGY: clone
+#     GIT_DEPTH: 0
+#   script:
+#     - git-cliff -r . > CHANGELOG.md
+#   artifacts:
+#     paths:
+#       - CHANGELOG.md
+#   rules:
+#     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 build-package:
   stage: build
@@ -72,8 +72,6 @@ test-package:
     - uv run --with pytest --with pytest_cov --dev pytest --cov-report=xml:cov.xml --junitxml=report.xml
   after_script:
     - uv cache prune --ci
-  needs:
-    - build-package
   coverage: '/TOTAL.*? (100(?:\.0+)?\%\\|[1-9]?\d(?:\.\d+)?\%)$/'
   artifacts:
     reports:
@@ -110,22 +108,22 @@ deploy-docs:
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH       # Run for all changes to the default branch
 
-deploy-changelog:
-  stage: deploy
-  image:
-    name: alpine/git:latest
-    entrypoint: [""]
-  dependencies:
-    - build-changelog
-  needs:
-    - job: build-changelog
-  before_script:
-    - git config user.name "$GITLAB_USER_NAME"
-    - git config user.email "$GITLAB_USER_EMAIL"
-  script:
-    - '[ -z "$(git status --porcelain)" ] && exit 0'
-    - git add CHANGELOG.md
-    - 'git commit --no-verify -m "docs(CHANGELOG.md): refresh changelog with new commits from $CI_COMMIT_SHORT_SHA"'
-    - git push $CI_REPOSITORY_URL HEAD:main
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+# deploy-changelog:
+#   stage: deploy
+#   image:
+#     name: alpine/git:latest
+#     entrypoint: [""]
+#   dependencies:
+#     - build-changelog
+#   needs:
+#     - job: build-changelog
+#   before_script:
+#     - git config user.name "$GITLAB_USER_NAME"
+#     - git config user.email "$GITLAB_USER_EMAIL"
+#   script:
+#     - '[ -z "$(git status --porcelain)" ] && exit 0'
+#     - git add CHANGELOG.md
+#     - 'git commit --no-verify -m "docs(CHANGELOG.md): refresh changelog with new commits from $CI_COMMIT_SHORT_SHA"'
+#     - git push $CI_REPOSITORY_URL HEAD:main
+#   rules:
+#     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

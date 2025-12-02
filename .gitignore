@@ -133,3 +133,4 @@ dmypy.json
 .gitlab-ci-local
 docs/**/*.md
 .gitlab-ci-local-variables.yml
+*.xml
