@@ -41,14 +41,14 @@ class NormalizedSoftAdapt(SoftAdaptBase):
             accuracy in the finite difference approximation.
     """
 
-    def __init__(self, beta: float = 0.1, accuracy_order: int | None = None):
+    def __init__(self, beta: float = 0.1, accuracy_order: int | None = None) -> None:
         super().__init__()
         self.beta = beta
         self.accuracy_order = accuracy_order
 
     def get_component_weights(
         self, *loss_component_values: tuple[KerasTensor], verbose: bool = True
-    ):
+    ) -> KerasTensor:
         """Class method for SoftAdapt weights.
 
         Args:

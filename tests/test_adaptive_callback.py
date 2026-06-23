@@ -8,7 +8,7 @@ from softadapt import AdaptiveLossCallback, algorithms
 
 class AdaptiveLossCallbackTest(testing.TestCase):
     # @pytest.mark.requires_trainable_backend
-    def test_adaptive_callback(self):
+    def test_adaptive_callback(self) -> None:
         """Test standard AdaptiveLossCallback functionalities with training."""
         batch_size = 4
         # Create a small test model
@@ -16,7 +16,10 @@ class AdaptiveLossCallbackTest(testing.TestCase):
             [layers.Input(shape=(2,), batch_size=batch_size), layers.Dense(1)]
         )
         # Use minimal set of losses
-        loss_list = [losses.MeanSquaredError(), losses.MeanAbsoluteError()]
+        loss_list: list[losses.MeanAbsoluteError | losses.MeanSquaredError] = [
+            losses.MeanSquaredError(),
+            losses.MeanAbsoluteError(),
+        ]
         # Compile with pre-defined weights
         model.compile(
             optimizer=optimizers.SGD(),

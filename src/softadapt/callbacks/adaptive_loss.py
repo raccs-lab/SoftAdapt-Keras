@@ -16,7 +16,8 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-from typing import Literal, NoReturn
+from softadapt.base._softadapt_base_class import SoftAdaptBase
+from typing import Literal
 
 import numpy as np
 from keras import KerasTensor, backend as K, callbacks, ops
@@ -43,6 +44,9 @@ class AdaptiveLossCallback(callbacks.Callback):
         calculate_on_validation (bool, optional): Calculate weights based on validation data, default (False) computes based on training data. Defaults to False.
     """
 
+    algorithm: SoftAdaptBase
+    backup_dir: str | None
+
     def __init__(
         self,
         components: list[str],
@@ -53,7 +57,7 @@ class AdaptiveLossCallback(callbacks.Callback):
         backup_dir: str | None = None,
         calculate_on_validation: bool = False,
         clip_weights: bool = False,
-    ):
+    ) -> None:
         super().__init__()
         if algorithm == "base":
             self.algorithm = SoftAdapt(beta=beta, accuracy_order=accuracy_order)
@@ -67,10 +71,10 @@ class AdaptiveLossCallback(callbacks.Callback):
             )
 
         self.frequency = frequency
-        self.order = [f"{component}_loss" for component in components]
-        self.components_history: list[KerasTensor] = [[] for _ in components]
+        self.order: list[str] = [f"{component}_loss" for component in components]
+        self.components_history: list[list[KerasTensor]] = [[] for _ in components]
         self.debug = False
-        self.val = calculate_on_validation
+        self.val: bool = calculate_on_validation
         self.clip_weights = clip_weights
         if backup_dir:
             self.backup_dir = backup_dir
@@ -97,41 +101,45 @@ class AdaptiveLossCallback(callbacks.Callback):
             return [
                 loss_tuple[2] for loss_tuple in self.model._compile_loss._flat_losses
             ]
+        else:
+            raise ValueError("Unable to find training weights.")
 
     @weights.setter
-    def weights(self, value: list[float]) -> NoReturn:
+    def weights(self, value: list[float]) -> None:
         """Setter for adaptive weights
 
         Args:
             value (list): List containing values for the weights.
 
-        Returns:
-            NoReturn: Does not return a value
         """
         if self.clip_weights:
             new_losses = [
                 ops.maximum(w, K.epsilon()) for w in value
             ]  # Clip weights to avoid going below 0
         else:
-            new_losses = value
+            new_losses: list[float] = value
 
         if hasattr(self.model, "loss_weights"):
+            # pyrefly: ignore [missing-attribute]
             self.model.loss_weights = new_losses
         elif hasattr(self.model, "_compile_loss"):
             flat_losses = self.model._compile_loss._flat_losses
             for i in range(len(flat_losses)):
                 flat_losses[i] = flat_losses[i][:2] + (value[i],) + flat_losses[i][3:]
 
-    def on_train_begin(self, logs: dict | None = None):
+        return
+
+    def on_train_begin(self, logs: dict | None = None) -> None:
         """Get adaptive loss state from temporary file and restore it.
 
 
         Args:
             logs (dict | None, optional): dictionary of computed losses. Defaults to None.
         """
-        if self.backup_dir is not None:
+        if self.backup_dir:
             if file_utils.exists(self._component_history_path):
                 saved_history = np.load(self._component_history_path)
+                # pyrefly: ignore [bad-assignment]
                 self.components_history = [
                     [ops.convert_to_tensor(i) for i in component]
                     for component in saved_history
@@ -141,7 +149,7 @@ class AdaptiveLossCallback(callbacks.Callback):
                 self.weights = ops.convert_to_tensor(saved_weights)
         return super().on_train_begin(logs)
 
-    def on_epoch_end(self, epoch: int, logs: dict | None = None):
+    def on_epoch_end(self, epoch: int, logs: dict | None = None) -> None:
         """Update component history in order for weight computation.
 
         Args:
@@ -149,18 +157,23 @@ class AdaptiveLossCallback(callbacks.Callback):
             logs (dict | None, optional): Computed loss values logs indexed by loss name. Defaults to None.
         """
         # Update component history in order for weight computation
-        if self.val:
+        if self.val and logs:
             for k in self.order:
                 self.components_history[self.order.index(k)].append(
                     ops.copy(logs["val_" + k])
                 )
-        else:
+        elif not self.val and logs:
             for k in self.order:
                 self.components_history[self.order.index(k)].append(ops.copy(logs[k]))
+        else:
+            pass
 
         # If the set number of epochs or frequency is met than recompute loss weights
         if (
-            (self.frequency == "epoch" or epoch % self.frequency == 0)
+            (
+                self.frequency == "epoch"
+                or (not isinstance(self.frequency, str) and epoch % self.frequency == 0)
+            )
             and epoch != 0
             and len(self.components_history[0]) > 1
         ):
@@ -178,7 +191,7 @@ class AdaptiveLossCallback(callbacks.Callback):
                     h.pop(0)
                 else:
                     h.clear()
-        if self.backup_dir is not None:
+        if self.backup_dir:
             if not file_utils.exists(self.backup_dir):
                 file_utils.makedirs(self.backup_dir)
             np.save(

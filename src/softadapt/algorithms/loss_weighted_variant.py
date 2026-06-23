@@ -50,7 +50,7 @@ class LossWeightedSoftAdapt(SoftAdaptBase):
 
     def get_component_weights(
         self, *loss_component_values: tuple[KerasTensor], verbose: bool = True
-    ):
+    ) -> KerasTensor:
         """Class method for SoftAdapt weights.
 
         Args:

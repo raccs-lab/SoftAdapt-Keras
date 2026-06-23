@@ -16,14 +16,14 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-import numpy as np
+from numpy import array
 
 # All constants are for forward finite difference method.
 _FIRST_ORDER = 1
-_FIRST_ORDER_COEFFICIENTS = np.array((-1, 1))
+_FIRST_ORDER_COEFFICIENTS = array((-1, 1))
 _THIRD_ORDER = 3
-_THIRD_ORDER_COEFFICIENTS = np.array((-11 / 6, 3, -3 / 2, 1 / 3))
+_THIRD_ORDER_COEFFICIENTS = array((-11 / 6, 3, -3 / 2, 1 / 3))
 _FIFTH_ORDER = 5
-_FIFTH_ORDER_COEFFICIENTS = np.array((-137 / 60, 5, -5, 10 / 3, -5 / 4, 1 / 5))
+_FIFTH_ORDER_COEFFICIENTS = array((-137 / 60, 5, -5, 10 / 3, -5 / 4, 1 / 5))
 
 _EPSILON = 1e-08

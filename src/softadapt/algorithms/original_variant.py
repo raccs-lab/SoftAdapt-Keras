@@ -40,15 +40,11 @@ class SoftAdapt(SoftAdaptBase):
     """
 
     def __init__(self, beta: float = 0.1, accuracy_order: int | None = None):
-        super().__init__()
-        self.beta = beta
-        # Passing "None" as the order of accuracy sets the highest possible
-        # accuracy in the finite difference approximation.
-        self.accuracy_order = accuracy_order
+        super().__init__(beta=beta, accuracy_order=accuracy_order)
 
     def get_component_weights(
         self, *loss_component_values: tuple[KerasTensor], verbose: bool = True
-    ):
+    ) -> KerasTensor:
         """Class method for SoftAdapt weights.
 
         Args:

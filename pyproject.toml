@@ -4,19 +4,19 @@ authors = [
     { name = "A. Ali Heydari", email = "aliheydari@ucdavis.edu" },
     { name = "Jacob Logas", email = "jacob@logas.me" },
 ]
-version = "0.1.3"
+version = "0.1.4"
 maintainers = [{ name = "Jacob Logas", email = "jacob@logas.me" }]
 description = "SoftAdapt: Techniques for Adaptive Loss Weighting of Neural Networks with Multi-Part Loss Functions implemented in Keras"
 readme = "README.md"
 license = "GPL-3.0-or-later"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 keywords = [
@@ -25,10 +25,13 @@ keywords = [
     "Adaptive-Weighting, Multi-Task-Nerual-Networks Optimization",
     "Gradient-Descent-Weighting, Machine Learning",
 ]
-dependencies = ["findiff>=0.12.1", "keras>=3.12.0"]
+dependencies = [
+    "findiff>=0.12.1",
+    "keras>=3.12.0",
+]
 
 [build-system]
-requires = ["uv_build>=0.9.10,<0.10.0"]
+requires = ["uv_build>=0.9.10,<0.12.0"]
 build-backend = "uv_build"
 
 [project.urls]
@@ -82,16 +85,35 @@ version_files = [
     "src/softadapt/__version__.py"
 ]
 
+
 [dependency-groups]
 dev = [
+    "pdoc3>=0.11.6",
     "pre-commit>=4.4.0",
+    "pyrefly>=1.1.1",
+    "ruff>=0.15.18",
+    {include-group = "test"}
+]
+test = [
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "pytest-mock>=3.15.1",
     "torch>=2.9.1",
 ]
 
 [tool.uv.sources]
-torch = [{ index = "pytorch", marker = "platform_system == 'Linux'" }]
+torch = [{ index = "pytorch", group = "test" }]
 
 [[tool.uv.index]]
 name = "pytorch"
 url = "https://download.pytorch.org/whl/cpu"
 explicit = true
+
+[tool.pyrefly]
+project-includes = [
+    "**/*.py*",
+    "**/*.ipynb",
+]
+project-excludes = [
+    "tests/**"
+]

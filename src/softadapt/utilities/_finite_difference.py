@@ -32,8 +32,8 @@ from softadapt.constants import (
 
 
 def _get_finite_difference(
-    input_array: np.array, order: int | None = None, *, verbose: bool = True
-):
+    input_array: np.ndarray, order: int | None = None, *, verbose: bool = True
+) -> float:
     """Internal utility method for estimating rate of change.
 
     This function aims to approximate the rate of change for a loss function,
@@ -70,7 +70,7 @@ def _get_finite_difference(
     if order is None:
         order = len(input_array) - 1
         if verbose:
-            log_msg = f"Interpreting finite difference order as {order} sinceno explicit order was specified."
+            log_msg: str = f"Interpreting finite difference order as {order} sinceno explicit order was specified."
             logging.info(msg=log_msg)
     elif order > len(input_array):
         error_msg = (
@@ -92,7 +92,7 @@ def _get_finite_difference(
         logging.info(msg=log_msg)
         input_array = input_array[(-1 * order - 1) :]
 
-    order_is_even = order % 2 == 0
+    order_is_even: bool = order % 2 == 0
     # Next, we want to retrieve the correct coefficients based on the order
     if order > _FIFTH_ORDER and not order_is_even:
         err_msg = "Accuracy orders larger than 5 must be even. Please check the arguments passed to the function."

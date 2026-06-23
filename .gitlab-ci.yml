@@ -5,15 +5,15 @@
 #   - .post
 
 variables:
-  UV_VERSION: "0.9"
+  UV_VERSION: "0.11"
   PYTHON_VERSION: "3.12"
-  BASE_LAYER: bookworm-slim
+  BASE_LAYER: trixie-slim
   UV_LINK_MODE: copy
   UV_CACHE_DIR: .uv-cache
   KERAS_BACKEND: "torch"
 
 default:
-  image: ghcr.io/astral-sh/uv:$UV_VERSION-python$PYTHON_VERSION-$BASE_LAYER
+  image: ghcr.io/astral-sh/uv:python$PYTHON_VERSION-$BASE_LAYER
   cache:
     - key:
         files:
@@ -65,12 +65,12 @@ build-docs:
       - docs/**/*.md
     expire_in: 1 week
   rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH       # Run for all changes to the default branch
+    - if: $CI_COMMIT_BRANCH == "main"       # Run for all changes to the default branch
 
 test-package:
   stage: test
   script:
-    - uv run --with pytest --with pytest_cov --dev pytest --cov-report=xml:cov.xml --junitxml=report.xml
+    - uv run --group test pytest --cov-report=xml:cov.xml --junitxml=report.xml
   after_script:
     - uv cache prune --ci
   coverage: '/TOTAL.*? (100(?:\.0+)?\%\\|[1-9]?\d(?:\.\d+)?\%)$/'
@@ -108,7 +108,7 @@ deploy-docs:
     - git -C ${CI_PROJECT_NAME}.wiki add .
     - git -C ${CI_PROJECT_NAME}.wiki commit -am "Updated triggered from $CI_COMMIT_SHORT_SHA $CI_COMMIT_MESSAGE" && git -C ${CI_PROJECT_NAME}.wiki push origin master || true
   rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH       # Run for all changes to the default branch
+    - if: $CI_COMMIT_BRANCH == "main"       # Run for all changes to the default branch
 
 # deploy-changelog:
 #   stage: deploy

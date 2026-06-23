@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
+from abc import abstractmethod
 from keras import KerasTensor, backend, ops
 
 from softadapt.utilities._finite_difference import _get_finite_difference
@@ -30,9 +31,23 @@ class SoftAdaptBase:
 
     """
 
-    def __init__(self):
+    epsilon: float
+    beta: float
+    accuracy_order: int | None
+
+    def __init__(self, beta=0.1, accuracy_order=None) -> None:
         """Initializer of the base method."""
         self.epsilon = backend.epsilon()
+        self.beta = beta
+        # Passing "None" as the order of accuracy sets the highest possible
+        # accuracy in the finite difference approximation.
+        self.accuracy_order = accuracy_order
+
+    @abstractmethod
+    def get_component_weights(
+        self, *loss_component_values: tuple[KerasTensor], verbose: bool = True
+    ) -> KerasTensor:
+        raise NotImplementedError
 
     def _softmax(
         self,
@@ -41,7 +56,7 @@ class SoftAdaptBase:
         numerator_weights: KerasTensor | None = None,
         *,
         shift_by_max_value: bool = True,
-    ):
+    ) -> KerasTensor:
         """Implementation of SoftAdapt's modified softmax function.
 
         Args:
@@ -74,8 +89,12 @@ class SoftAdaptBase:
         return exp_of_input / (ops.sum(exp_of_input) + self.epsilon)
 
     def _compute_rates_of_change(
-        self, input_tensor: KerasTensor, order: int = 5, *, verbose: bool = True
-    ):
+        self,
+        input_tensor: KerasTensor | tuple[KerasTensor],
+        order: int | None = 5,
+        *,
+        verbose: bool = True,
+    ) -> float:
         """Base class method for computing loss functions rate of change.
 
         Args:
