@@ -96,6 +96,7 @@ deploy-docs:
 deploy-bump:
   stage: deploy
   image: ghcr.io/astral-sh/uv:python$PYTHON_VERSION-trixie
+  needs: [test-package]
   before_script:
     - uv tool install commitizen
     - git config --global user.email "${GITLAB_USER_EMAIL}" && git config --global user.name "${GITLAB_USER_NAME}"
@@ -103,8 +104,6 @@ deploy-bump:
     - git checkout -b master
   after_script:
     - uv cache prune --ci
-  dependencies:
-    - test-package
   script:
     - cz bump --no-verify
     - git push origin master:$CI_COMMIT_REF_NAME
@@ -126,6 +125,7 @@ deploy-bump:
 deploy-bump-prerelease:
   stage: deploy
   image: ghcr.io/astral-sh/uv:python$PYTHON_VERSION-trixie
+  needs: [test-package]
   before_script:
     - uv tool install commitizen
     - git config --global user.email "${GITLAB_USER_EMAIL}" && git config --global user.name "${GITLAB_USER_NAME}"
@@ -133,8 +133,6 @@ deploy-bump-prerelease:
     - git checkout -b dev
   after_script:
     - uv cache prune --ci
-  dependencies:
-    - test-package
   script:
     - cz bump --no-verify -pr rc
     - git push origin dev:$CI_COMMIT_REF_NAME
@@ -177,8 +175,7 @@ deploy-to-pypi:
   image: ghcr.io/astral-sh/uv:python$PYTHON_VERSION-$BASE_LAYER
   dependencies:
     - build-package
-  needs:
-    - job: build-package
+  needs: [build-package, deploy-bump]
   environment: release
   id_tokens:
     PYPI_ID_TOKEN:
@@ -193,8 +190,7 @@ deploy-to-testpypi:
   image: ghcr.io/astral-sh/uv:python$PYTHON_VERSION-$BASE_LAYER
   dependencies:
     - build-package
-  needs:
-    - job: build-package
+  needs: [build-package, deploy-bump]
   environment: release
   id_tokens:
     PYPI_ID_TOKEN:
