@@ -108,19 +108,20 @@ deploy-bump:
   script:
     - cz bump --no-verify
     - git push origin master:$CI_COMMIT_REF_NAME
-    - git tag
     - TAG=$(git describe --tags --abbrev=0)
+    - echo $TAG
     - echo "#!/bin/sh" >> variables
     - echo "export TAG='$TAG'" >> variables
-    - echo "#!/bin/sh" >> variables
-    - echo "export TAG='$TAG'" >> variables
-    - git push origin --tags
+    - git push origin $TAG
   only:
     refs:
       - master
   artifacts:
     paths:
       - variables
+  allow_failure:
+    exit_codes:
+      - 21
 
 deploy-bump-prerelease:
   stage: deploy
@@ -140,13 +141,16 @@ deploy-bump-prerelease:
     - echo "#!/bin/sh" >> variables
     - TAG=$(git describe --tags --abbrev=0)
     - echo "export TAG='$TAG'" >> variables
-    - git push origin --tags
+    - git push origin $TAG
   only:
     refs:
       - dev
   artifacts:
     paths:
       - variables
+  allow_failure:
+    exit_codes:
+      - 3
 
 # deploy-changelog:
 #   stage: deploy
