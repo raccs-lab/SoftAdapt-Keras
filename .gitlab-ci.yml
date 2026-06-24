@@ -32,8 +32,7 @@ build-package:
     paths:
       - dist/
   rules:
-    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'  # Run for all changes to a merge request's source branch
-      changes:
+    - changes:
         - src/softadapt/**/*
 
 build-docs:
@@ -48,8 +47,9 @@ build-docs:
     paths:
       - docs/**/*.md
     expire_in: 1 week
-  rules:
-    - if: $CI_COMMIT_BRANCH == "main"       # Run for all changes to the default branch
+  only:
+    refs:
+      - dev
 
 test-package:
   stage: test
@@ -65,8 +65,7 @@ test-package:
         coverage_format: cobertura
         path: cov.xml
   rules:
-    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'  # Run for all changes to a merge request's source branch
-      changes:
+    - changes:
         - src/softadapt/**/*
         - tests/**/*
 
@@ -100,13 +99,13 @@ deploy-bump:
   before_script:
     - uv tool install commitizen
     - git config --global user.email "${GITLAB_USER_EMAIL}" && git config --global user.name "${GITLAB_USER_NAME}"
-    - 'exists=`git show-ref refs/heads/master` && if [ -n "$exists" ]; then git branch -D master; fi'
-    - git checkout -b master
+    - 'exists=`git show-ref refs/heads/main` && if [ -n "$exists" ]; then git branch -D main; fi'
+    - git checkout -b main
   after_script:
     - uv cache prune --ci
   script:
     - cz bump --no-verify
-    - git push origin master:$CI_COMMIT_REF_NAME
+    - git push origin main:$CI_COMMIT_REF_NAME
     - TAG=$(git describe --tags --abbrev=0)
     - echo $TAG
     - echo "#!/bin/sh" >> variables
@@ -114,7 +113,7 @@ deploy-bump:
     - git push origin $TAG
   only:
     refs:
-      - master
+      - main
   artifacts:
     paths:
       - variables
@@ -190,15 +189,16 @@ deploy-to-testpypi:
   image: ghcr.io/astral-sh/uv:python$PYTHON_VERSION-$BASE_LAYER
   dependencies:
     - build-package
-  needs: [build-package, deploy-bump]
+  needs: [build-package, deploy-bump-prerelease]
   environment: release
   id_tokens:
     PYPI_ID_TOKEN:
       aud: testpypi
   script:
     - uv publish --index testpypi
-  rules:
-    - if: $CI_COMMIT_BRANCH == "dev" && $CI_PIPELINE_SOURCE != 'merge_request_event'
+  only:
+    refs:
+      - dev
 
 # deploy-to-gitlab-releases:
 #   stage: deploy
