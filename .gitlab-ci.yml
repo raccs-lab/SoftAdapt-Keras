@@ -11,6 +11,7 @@ variables:
   UV_LINK_MODE: copy
   UV_CACHE_DIR: .uv-cache
   KERAS_BACKEND: "torch"
+  API_IMAGE_NAME: $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_NAME
 
 default:
   image: ghcr.io/astral-sh/uv:python$PYTHON_VERSION-$BASE_LAYER
@@ -20,23 +21,6 @@ default:
           - uv.lock
       paths:
         - $UV_CACHE_DIR
-
-build-changelog:
-  stage: build
-  image:
-    name: orhunp/git-cliff:latest
-    entrypoint: [""]
-  variables:
-    GIT_STRATEGY: clone # clone entire repo instead of reusing workspace
-    GIT_DEPTH: 0 # avoid shallow clone to give cliff all the info it needs
-  script:
-    - git-cliff -r . > CHANGELOG.md
-  artifacts:
-    expose_as: 'CHANGELOG'
-    paths:
-      - CHANGELOG.md
-  rules:
-    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'  # Run for all changes to a merge request's source branch
 
 build-package:
   stage: build
@@ -85,7 +69,6 @@ test-package:
       changes:
         - src/softadapt/**/*
         - tests/**/*
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 deploy-docs:
   stage: deploy
@@ -108,7 +91,62 @@ deploy-docs:
     - git -C ${CI_PROJECT_NAME}.wiki add .
     - git -C ${CI_PROJECT_NAME}.wiki commit -am "Updated triggered from $CI_COMMIT_SHORT_SHA $CI_COMMIT_MESSAGE" && git -C ${CI_PROJECT_NAME}.wiki push origin master || true
   rules:
-    - if: $CI_COMMIT_BRANCH == "main"       # Run for all changes to the default branch
+    - if: $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE != "merge_request_event"      # Run for all changes to the default branch
+
+deploy-bump:
+  stage: deploy
+  image: ghcr.io/astral-sh/uv:python$PYTHON_VERSION-trixie
+  before_script:
+    - uv tool install commitizen
+    - git config --global user.email "${GITLAB_USER_EMAIL}" && git config --global user.name "${GITLAB_USER_NAME}"
+    - 'exists=`git show-ref refs/heads/master` && if [ -n "$exists" ]; then git branch -D master; fi'
+    - git checkout -b master
+  after_script:
+    - uv cache prune --ci
+  dependencies:
+    - test-package
+  script:
+    - cz bump --no-verify
+    - git push origin master:$CI_COMMIT_REF_NAME
+    - git tag
+    - TAG=$(git describe --tags --abbrev=0)
+    - echo "#!/bin/sh" >> variables
+    - echo "export TAG='$TAG'" >> variables
+    - echo "#!/bin/sh" >> variables
+    - echo "export TAG='$TAG'" >> variables
+    - git push origin --tags
+  only:
+    refs:
+      - master
+  artifacts:
+    paths:
+      - variables
+
+deploy-bump-prerelease:
+  stage: deploy
+  image: ghcr.io/astral-sh/uv:python$PYTHON_VERSION-trixie
+  before_script:
+    - uv tool install commitizen
+    - git config --global user.email "${GITLAB_USER_EMAIL}" && git config --global user.name "${GITLAB_USER_NAME}"
+    - 'exists=`git show-ref refs/heads/dev` && if [ -n "$exists" ]; then git branch -D dev; fi'
+    - git checkout -b dev
+  after_script:
+    - uv cache prune --ci
+  dependencies:
+    - test-package
+  script:
+    - cz bump --no-verify -pr rc
+    - git push origin dev:$CI_COMMIT_REF_NAME
+    - echo "#!/bin/sh" >> variables
+    - TAG=$(git describe --tags --abbrev=0)
+    - echo "export TAG='$TAG'" >> variables
+    - git push origin --tags
+  only:
+    refs:
+      - dev
+  artifacts:
+    paths:
+      - variables
 
 # deploy-changelog:
 #   stage: deploy
@@ -128,4 +166,62 @@ deploy-docs:
 #     - 'git commit --no-verify -m "docs(CHANGELOG.md): refresh changelog with new commits from $CI_COMMIT_SHORT_SHA"'
 #     - git push $CI_REPOSITORY_URL HEAD:main
 #   rules:
-#     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+#     - if: $CI_COMMIT_BRANCH == "main"
+
+deploy-to-pypi:
+  stage: deploy
+  image: ghcr.io/astral-sh/uv:python$PYTHON_VERSION-$BASE_LAYER
+  dependencies:
+    - build-package
+  needs:
+    - job: build-package
+  environment: release
+  id_tokens:
+    PYPI_ID_TOKEN:
+      aud: pypi
+  script:
+    - uv publish
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE != 'merge_request_event'
+
+deploy-to-testpypi:
+  stage: deploy
+  image: ghcr.io/astral-sh/uv:python$PYTHON_VERSION-$BASE_LAYER
+  dependencies:
+    - build-package
+  needs:
+    - job: build-package
+  environment: release
+  id_tokens:
+    PYPI_ID_TOKEN:
+      aud: testpypi
+  script:
+    - uv publish --index testpypi
+  rules:
+    - if: $CI_COMMIT_BRANCH == "dev" && $CI_PIPELINE_SOURCE != 'merge_request_event'
+
+# deploy-to-gitlab-releases:
+#   stage: deploy
+#   image: alpine/git:latest
+#   dependencies:
+#     - build-package
+#   needs:
+#     - job: build-package
+#   before_script:
+#     - git config user.name "$GITLAB_USER_NAME"
+#     - git config user.email "$GITLAB_USER_EMAIL"
+#   script:
+#     - |
+#       VERSION=$(git describe --tags --abbrev=0) || git tag --list | tail -1
+#     - cp -r dist/* .
+#     - rm CHANGELOG.md 2>/dev/null || true
+#     - '[ -z "$(git status --porcelain)" ] && exit 0'
+#     - git commit --no-verify -m "docs(release): prepare $VERSION for PyPi"
+#     - git tag "$VERSION"
+#     - git push origin "$VERSION" --force
+#   artifacts:
+#     paths:
+#       - dist/*
+#     expire_in: 3 days
+#   rules:
+#     - if: $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE != 'merge_request_event'
