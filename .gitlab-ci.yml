@@ -110,11 +110,11 @@ deploy-bump:
   before_script:
     - uv tool install commitizen
     - git config --global user.email "${GITLAB_USER_EMAIL}" && git config --global user.name "${GITLAB_USER_NAME}"
-    # - 'exists=`git show-ref refs/heads/dev` && if [ -n "$exists" ]; then git pull origin main --unshallow; fi'
+    - 'exists=`git show-ref refs/heads/main` && if [ -n "$exists" ]; then git pull origin main; fi'
   after_script:
     - uv cache prune --ci
   script:
-    - cz bump --no-verify
+    - cz bump --no-verify || exit $?
     - git push origin main:$CI_COMMIT_REF_NAME
     - TAG=$(git describe --tags --abbrev=0)
     - echo $TAG
@@ -137,11 +137,11 @@ deploy-bump-prerelease:
   before_script:
     - uv tool install commitizen
     - git config --global user.email "${GITLAB_USER_EMAIL}" && git config --global user.name "${GITLAB_USER_NAME}"
-    # - 'exists=`git show-ref refs/heads/dev` && if [ -n "$exists" ]; then git pull origin dev --unshallow; fi'
+    - 'exists=`git show-ref refs/heads/dev` && if [ -n "$exists" ]; then git pull origin dev; fi'
   after_script:
     - uv cache prune --ci
   script:
-    - cz bump --no-verify -pr rc
+    - cz bump --no-verify -pr rc || exit $?
     - git push origin dev:$CI_COMMIT_REF_NAME
     - echo "#!/bin/sh" >> variables
     - TAG=$(git describe --tags --abbrev=0)
