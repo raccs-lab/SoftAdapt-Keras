@@ -135,6 +135,7 @@ deploy-to-pypi:
   artifacts:
     paths:
       - variables
+      - dist/*
   allow_failure:
     exit_codes:
       - 21
@@ -160,9 +161,10 @@ deploy-to-testpypi:
     - git push origin $TAG
   rules:
     - if: $CI_COMMIT_BRANCH == 'dev' && $CI_PIPELINE_SOURCE != 'merge_request_event'      # Run for all changes to the default branch
-  artifacts:
+artifacts:
     paths:
       - variables
+      - dist/*
   allow_failure:
     exit_codes:
       - 3
