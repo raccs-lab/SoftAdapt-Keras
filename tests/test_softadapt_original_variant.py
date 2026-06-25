@@ -1,6 +1,5 @@
 """Unit testing for the original SoftAdapt variant."""
 
-import numpy as np
 import pytest
 from keras import backend, ops
 from softadapt.algorithms import SoftAdapt
@@ -16,7 +15,9 @@ def softadapt_instance():
     return SoftAdapt(beta=0.1)
 
 
-def test_beta_positive_three_components(softadapt_instance, rtol):
+def test_beta_positive_three_components(
+    softadapt_instance: SoftAdapt, rtol: float
+) -> None:
     loss_component1 = ops.convert_to_tensor([1, 2, 3, 4, 5], backend.floatx())
     loss_component2 = ops.convert_to_tensor([150, 100, 50, 10, 0.1], backend.floatx())
     loss_component3 = ops.convert_to_tensor([1500, 1000, 500, 100, 1], backend.floatx())
@@ -29,26 +30,33 @@ def test_beta_positive_three_components(softadapt_instance, rtol):
         loss_component1, loss_component2, loss_component3, verbose=False
     )
 
-    assert np.isclose(
-        ops.convert_to_numpy(alpha_0),
-        ops.convert_to_numpy(solutions[0]),
+    assert ops.isclose(
+        alpha_0,
+        solutions[0],
         rtol=rtol,
     ), (
         "Incorrect SoftAdapt calculation for simple 'dominant loss' case.The first loss component failed."
     )
 
-    assert np.isclose(
-        ops.convert_to_numpy(alpha_1),
-        ops.convert_to_numpy(solutions[1]),
+    assert ops.isclose(
+        alpha_1,
+        solutions[1],
         rtol=rtol,
     ), (
         "Incorrect SoftAdapt calculation for simple 'dominant loss' case.The second loss component failed."
     )
 
-    assert np.isclose(
-        ops.convert_to_numpy(alpha_2),
-        ops.convert_to_numpy(solutions[2]),
+    assert ops.isclose(
+        alpha_2,
+        solutions[2],
         rtol=rtol,
     ), (
         "Incorrect SoftAdapt calculation for simple 'dominant loss' case.The third loss component failed."
     )
+
+
+def test_loss_component_values_1(softadapt_instance: SoftAdapt, rtol: float) -> None:
+    loss_component1 = ops.convert_to_tensor([1, 2, 3, 4, 5], backend.floatx())
+
+    with pytest.warns(UserWarning):
+        softadapt_instance.get_component_weights(loss_component1, verbose=False)
