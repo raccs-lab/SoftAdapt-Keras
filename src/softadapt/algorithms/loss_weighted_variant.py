@@ -40,14 +40,6 @@ class LossWeightedSoftAdapt(SoftAdaptBase):
           volume approximation of each loss component's slope.
     """
 
-    def __init__(self, beta: float = 0.1, accuracy_order: int | None = None):
-        """SoftAdapt class initializer."""
-        super().__init__()
-        self.beta = beta
-        # Passing "None" as the order of accuracy sets the highest possible
-        # accuracy in the finite difference approximation.
-        self.accuracy_order = accuracy_order
-
     def get_component_weights(
         self, *loss_component_values: tuple[KerasTensor], verbose: bool = True
     ) -> KerasTensor:
@@ -72,12 +64,14 @@ class LossWeightedSoftAdapt(SoftAdaptBase):
         """
         if len(loss_component_values) == 1:
             warnings.warn(
-                "You have only passed on the values of one loss component, which will result in trivial weighting.",
+                UserWarning(
+                    "You have only passed on the values of one loss component, which will result in trivial weighting."
+                ),
                 stacklevel=2,
             )
 
-        rates_of_change = []
-        average_loss_values = []
+        rates_of_change: list[float] = []
+        average_loss_values: list[KerasTensor] = []
 
         for loss_points in loss_component_values:
             # Compute the rates of change for each one of the loss components.
