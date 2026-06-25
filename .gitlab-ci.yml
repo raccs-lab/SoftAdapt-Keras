@@ -1,13 +1,15 @@
-# stages:
-#   - build
-#   - test
-#   - deploy
-#   - .post
+stages:
+  - .pre
+  - build
+  - test
+  - deploy
+  - docs
+  - .post
 
 variables:
-  UV_VERSION: "0.11"
+  UV_VERSION: "0.11.24"
   PYTHON_VERSION: "3.12"
-  BASE_LAYER: trixie-slim
+  BASE_LAYER: trixie
   UV_LINK_MODE: copy
   UV_CACHE_DIR: .uv-cache
   KERAS_BACKEND: "torch"
@@ -17,54 +19,23 @@ include:
   - component: gitlab.com/components/secret-detection/secret-detection@2.3.0
     inputs:
       enable_mr_pipelines: true
-      stage: test
+      stage: .pre
 
 default:
   image: ghcr.io/astral-sh/uv:python$PYTHON_VERSION-$BASE_LAYER
   cache:
     - key:
         files:
-          - uv.lock
+          - pyproject.toml
       paths:
         - $UV_CACHE_DIR
-
-build-package:
-  stage: build
-  script:
-    - uv build
   after_script:
     - uv cache prune --ci
-  artifacts:
-    paths:
-      - dist/
-  rules:
-    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
-      changes:
-        - src/softadapt/**/*
-    - if: $CI_COMMIT_BRANCH == 'main'
-    - if: $CI_COMMIT_BRANCH == 'dev'
-
-build-docs:
-  stage: build
-  script:
-    - uv run --dev --with pdoc $CI_PROJECT_DIR/scripts/make_docs.py
-  after_script:
-    - uv cache prune --ci
-  variables:
-    PDOC_ALLOW_EXEC: 1
-  artifacts:
-    paths:
-      - docs/**/*.md
-    expire_in: 1 week
-  rules:
-    - if: $CI_COMMIT_BRANCH == 'main'
 
 test-package:
   stage: test
   script:
     - uv run --group test pytest --cov-report=xml:cov.xml --junitxml=report.xml
-  after_script:
-    - uv cache prune --ci
   coverage: '/TOTAL.*? (100(?:\.0+)?\%\\|[1-9]?\d(?:\.\d+)?\%)$/'
   artifacts:
     reports:
@@ -80,81 +51,45 @@ test-package:
     - if: $CI_COMMIT_BRANCH == 'main'
     - if: $CI_COMMIT_BRANCH == 'dev'
 
-deploy-docs:
-  stage: deploy
-  image: 
-    name: alpine/git:latest
-    entrypoint: [""]
-  variables:
-    WIKI_URL: ${CI_SERVER_PROTOCOL}://project_${CI_PROJECT_ID}_bot:${WIKI_WRITE_TOKEN}@${CI_SERVER_HOST}:${CI_SERVER_PORT}/${CI_PROJECT_PATH}.wiki.git
-  dependencies:
-    - build-docs
-  needs:
-    - job: build-docs
-  script:
-    - cd ..
-    - git clone "${WIKI_URL}"
-    - git -C ${CI_PROJECT_NAME}.wiki config user.name "$GITLAB_USER_NAME"
-    - git -C ${CI_PROJECT_NAME}.wiki config user.email "$GITLAB_USER_EMAIL"
-    - cp -r ${CI_PROJECT_NAME}/docs/* ${CI_PROJECT_NAME}.wiki
-    - '[ -z "$(git -C ${CI_PROJECT_NAME}.wiki status --porcelain)" ] && exit 0'
-    - git -C ${CI_PROJECT_NAME}.wiki add .
-    - git -C ${CI_PROJECT_NAME}.wiki commit -am "Updated triggered from $CI_COMMIT_SHORT_SHA $CI_COMMIT_MESSAGE" && git -C ${CI_PROJECT_NAME}.wiki push origin master || true
-  rules:
-    - if: $CI_COMMIT_BRANCH == 'main' && $CI_PIPELINE_SOURCE != 'merge_request_event'      # Run for all changes to the default branch
+# versioning-bump:
+#   stage: versioning
+#   needs: [test-package]
+#   before_script:
+#     - git config --global user.email "${GITLAB_USER_EMAIL}" && git config --global user.name "${GITLAB_USER_NAME}"
+#     - 'exists=`git show-ref refs/heads/main` && if [ -n "$exists" ]; then git pull origin main; fi'
+#   script:
+#     - uvx --from commitizen cz bump --no-verify || exit $?
+#     - git push origin main:$CI_COMMIT_REF_NAME
+#     - TAG=$(git describe --tags --abbrev=0)
+#     - echo $TAG
+#     - echo "#!/bin/sh" >> variables
+#     - echo "export TAG='$TAG'" >> variables
+#     - git push origin $TAG
+#   rules:
+#     - if: $CI_COMMIT_BRANCH == 'main' && $CI_PIPELINE_SOURCE != 'merge_request_event'
 
-deploy-bump:
-  stage: deploy
-  image: ghcr.io/astral-sh/uv:python$PYTHON_VERSION-trixie
-  needs: [test-package]
-  before_script:
-    - uv tool install commitizen
-    - git config --global user.email "${GITLAB_USER_EMAIL}" && git config --global user.name "${GITLAB_USER_NAME}"
-    - 'exists=`git show-ref refs/heads/main` && if [ -n "$exists" ]; then git pull origin main; fi'
-  after_script:
-    - uv cache prune --ci
-  script:
-    - cz bump --no-verify || exit $?
-    - git push origin main:$CI_COMMIT_REF_NAME
-    - TAG=$(git describe --tags --abbrev=0)
-    - echo $TAG
-    - echo "#!/bin/sh" >> variables
-    - echo "export TAG='$TAG'" >> variables
-    - git push origin $TAG
-  rules:
-    - if: $CI_COMMIT_BRANCH == 'main' && $CI_PIPELINE_SOURCE != 'merge_request_event'
-  artifacts:
-    paths:
-      - variables
-  allow_failure:
-    exit_codes:
-      - 21
 
-deploy-bump-prerelease:
-  stage: deploy
-  image: ghcr.io/astral-sh/uv:python$PYTHON_VERSION-trixie
-  needs: [test-package]
-  before_script:
-    - uv tool install commitizen
-    - git config --global user.email "${GITLAB_USER_EMAIL}" && git config --global user.name "${GITLAB_USER_NAME}"
-    - 'exists=`git show-ref refs/heads/dev` && if [ -n "$exists" ]; then git pull origin dev; fi'
-  after_script:
-    - uv cache prune --ci
-  script:
-    - cz bump --no-verify -pr rc || exit $?
-    - git push origin dev:$CI_COMMIT_REF_NAME
-    - echo "#!/bin/sh" >> variables
-    - TAG=$(git describe --tags --abbrev=0)
-    - echo "export TAG='$TAG'" >> variables
-    - git push origin $TAG
-  rules:
-    - if: $CI_COMMIT_BRANCH == 'dev' && $CI_PIPELINE_SOURCE != 'merge_request_event'
-  artifacts:
-    paths:
-      - variables
-  allow_failure:
-    exit_codes:
-      - 3
+# versioning-bump-prerelease:
+#   stage: versioning
+#   needs: [test-package]
+#   before_script:
+#     - git config --global user.email "${GITLAB_USER_EMAIL}" && git config --global user.name "${GITLAB_USER_NAME}"
+#     - 'exists=`git show-ref refs/heads/dev` && if [ -n "$exists" ]; then git pull origin dev; fi'
+#   script:
+#     - uvx --from commitizen cz bump --no-verify -pr rc || exit $?
+#     - git push origin dev:$CI_COMMIT_REF_NAME
+#     - echo "#!/bin/sh" >> variables
+#     - TAG=$(git describe --tags --abbrev=0)
+#     - echo "export TAG='$TAG'" >> variables
+#     - git push origin $TAG
+#   rules:
+#     - if: $CI_COMMIT_BRANCH == 'dev' && $CI_PIPELINE_SOURCE != 'merge_request_event'
+#   artifacts:
+#     paths:
+#       - variables
+#   allow_failure:
+#     exit_codes:
+#       - 3
 
 # deploy-changelog:
 #   stage: deploy
@@ -178,37 +113,95 @@ deploy-bump-prerelease:
 
 deploy-to-pypi:
   stage: deploy
-  image: ghcr.io/astral-sh/uv:python$PYTHON_VERSION-trixie
-  dependencies:
-    - build-package
-  needs: [build-package, deploy-bump]
   environment: release
   id_tokens:
     PYPI_ID_TOKEN:
       aud: pypi
   before_script:
-    - git pull
+    - git config --global user.email "${GITLAB_USER_EMAIL}" && git config --global user.name "${GITLAB_USER_NAME}"
+    - git fetch origin main
+    - git reset --hard origin/main
   script:
+    - uvx --from commitizen cz bump --no-verify || exit $?
+    - uv build
     - uv publish
+    - git push origin main:$CI_COMMIT_REF_NAME
+    - echo "#!/bin/sh" >> variables
+    - TAG=$(git describe --tags --abbrev=0)
+    - echo "export TAG='$TAG'" >> variables
+    - git push origin $TAG
   rules:
     - if: $CI_COMMIT_BRANCH == 'main' && $CI_PIPELINE_SOURCE != 'merge_request_event'      # Run for all changes to the default branch
+  artifacts:
+    paths:
+      - variables
+  allow_failure:
+    exit_codes:
+      - 21
 
 deploy-to-testpypi:
   stage: deploy
-  image: ghcr.io/astral-sh/uv:python$PYTHON_VERSION-trixie
-  dependencies:
-    - build-package
-  needs: [build-package, deploy-bump-prerelease]
   environment: release
   id_tokens:
     PYPI_ID_TOKEN:
       aud: testpypi
   before_script:
-    - git pull
+    - git config --global user.email "${GITLAB_USER_EMAIL}" && git config --global user.name "${GITLAB_USER_NAME}"
+    - git fetch origin dev
+    - git reset --hard origin/dev
   script:
+    - uvx --from commitizen cz bump --no-verify -pr rc || exit $?
+    - uv build
     - uv publish --index testpypi
+    - git push origin dev:$CI_COMMIT_REF_NAME
+    - echo "#!/bin/sh" >> variables
+    - TAG=$(git describe --tags --abbrev=0)
+    - echo "export TAG='$TAG'" >> variables
+    - git push origin $TAG
   rules:
     - if: $CI_COMMIT_BRANCH == 'dev' && $CI_PIPELINE_SOURCE != 'merge_request_event'      # Run for all changes to the default branch
+  artifacts:
+    paths:
+      - variables
+  allow_failure:
+    exit_codes:
+      - 3
+
+
+## DOCS Pipelines
+
+build-docs:
+  stage: build
+  script:
+    - uv run --dev --with pdoc $CI_PROJECT_DIR/scripts/make_docs.py
+  variables:
+    PDOC_ALLOW_EXEC: 1
+  artifacts:
+    paths:
+      - docs/**/*.md
+    expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_BRANCH == 'main' && $CI_PIPELINE_SOURCE != 'merge_request_event'      # Run for all changes to the default branch
+
+deploy-docs:
+  stage: deploy
+  variables:
+    WIKI_URL: ${CI_SERVER_PROTOCOL}://project_${CI_PROJECT_ID}_bot:${WIKI_WRITE_TOKEN}@${CI_SERVER_HOST}:${CI_SERVER_PORT}/${CI_PROJECT_PATH}.wiki.git
+  dependencies:
+    - build-docs
+  needs:
+    - job: build-docs
+  script:
+    - cd ..
+    - git clone "${WIKI_URL}"
+    - git -C ${CI_PROJECT_NAME}.wiki config user.name "$GITLAB_USER_NAME"
+    - git -C ${CI_PROJECT_NAME}.wiki config user.email "$GITLAB_USER_EMAIL"
+    - cp -r ${CI_PROJECT_NAME}/docs/* ${CI_PROJECT_NAME}.wiki
+    - '[ -z "$(git -C ${CI_PROJECT_NAME}.wiki status --porcelain)" ] && exit 0'
+    - git -C ${CI_PROJECT_NAME}.wiki add .
+    - git -C ${CI_PROJECT_NAME}.wiki commit -am "Updated triggered from $CI_COMMIT_SHORT_SHA $CI_COMMIT_MESSAGE" && git -C ${CI_PROJECT_NAME}.wiki push origin master || true
+  rules:
+    - if: $CI_COMMIT_BRANCH == 'main' && $CI_PIPELINE_SOURCE != 'merge_request_event'      # Run for all changes to the default branch
 
 # deploy-to-gitlab-releases:
 #   stage: deploy
