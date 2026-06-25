@@ -56,7 +56,7 @@ filterwarnings = [
     # Ignore a spurious warning on tf-nightly related to save model changes.
     "ignore:Custom mask layers require a config",
 ]
-addopts = "--cov=softadapt --cov-report term"
+addopts = "--cov=softadapt --cov-report term --cov-report=xml:cov.xml"
 
 [tool.coverage.run]
 relative_files = true
