@@ -110,8 +110,7 @@ deploy-bump:
   before_script:
     - uv tool install commitizen
     - git config --global user.email "${GITLAB_USER_EMAIL}" && git config --global user.name "${GITLAB_USER_NAME}"
-    - 'exists=`git show-ref refs/heads/main` && if [ -n "$exists" ]; then git branch -D main; fi'
-    - git checkout -b main
+    # - 'exists=`git show-ref refs/heads/dev` && if [ -n "$exists" ]; then git pull origin main --unshallow; fi'
   after_script:
     - uv cache prune --ci
   script:
@@ -138,8 +137,7 @@ deploy-bump-prerelease:
   before_script:
     - uv tool install commitizen
     - git config --global user.email "${GITLAB_USER_EMAIL}" && git config --global user.name "${GITLAB_USER_NAME}"
-    - 'exists=`git show-ref refs/heads/dev` && if [ -n "$exists" ]; then git branch -D dev; fi'
-    - git checkout -b dev
+    # - 'exists=`git show-ref refs/heads/dev` && if [ -n "$exists" ]; then git pull origin dev --unshallow; fi'
   after_script:
     - uv cache prune --ci
   script:
