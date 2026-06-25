@@ -79,7 +79,7 @@ test-package:
         - tests/**/*
     - if: $CI_COMMIT_BRANCH == 'main'
     - if: $CI_COMMIT_BRANCH == 'dev'
-    
+
 deploy-docs:
   stage: deploy
   image: 
@@ -192,6 +192,8 @@ deploy-to-pypi:
     - git pull
   script:
     - uv publish
+  rules:
+    - if: $CI_COMMIT_BRANCH == 'main' && $CI_PIPELINE_SOURCE != 'merge_request_event'      # Run for all changes to the default branch
 
 deploy-to-testpypi:
   stage: deploy
@@ -207,6 +209,8 @@ deploy-to-testpypi:
     - git pull
   script:
     - uv publish --index testpypi
+  rules:
+    - if: $CI_COMMIT_BRANCH == 'dev' && $CI_PIPELINE_SOURCE != 'merge_request_event'      # Run for all changes to the default branch
 
 # deploy-to-gitlab-releases:
 #   stage: deploy
