@@ -38,8 +38,11 @@ build-package:
     paths:
       - dist/
   rules:
-    - changes:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+      changes:
         - src/softadapt/**/*
+    - if: $CI_COMMIT_BRANCH == 'main'
+    - if: $CI_COMMIT_BRANCH == 'dev'
 
 build-docs:
   stage: build
@@ -53,9 +56,8 @@ build-docs:
     paths:
       - docs/**/*.md
     expire_in: 1 week
-  only:
-    refs:
-      - dev
+  rules:
+    - if: $CI_COMMIT_BRANCH == 'main'
 
 test-package:
   stage: test
@@ -75,7 +77,9 @@ test-package:
       changes:
         - src/softadapt/**/*
         - tests/**/*
-
+    - if: $CI_COMMIT_BRANCH == 'main'
+    - if: $CI_COMMIT_BRANCH == 'dev'
+    
 deploy-docs:
   stage: deploy
   image: 
