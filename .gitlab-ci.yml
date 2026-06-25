@@ -161,7 +161,7 @@ deploy-to-testpypi:
     - git push origin $TAG
   rules:
     - if: $CI_COMMIT_BRANCH == 'dev' && $CI_PIPELINE_SOURCE != 'merge_request_event'      # Run for all changes to the default branch
-artifacts:
+  artifacts:
     paths:
       - variables
       - dist/*
