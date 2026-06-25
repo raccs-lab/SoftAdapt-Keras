@@ -13,6 +13,12 @@ variables:
   KERAS_BACKEND: "torch"
   API_IMAGE_NAME: $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_NAME
 
+include:
+  - component: gitlab.com/components/secret-detection/secret-detection@2.3.0
+    inputs:
+      enable_mr_pipelines: true
+      stage: test
+
 default:
   image: ghcr.io/astral-sh/uv:python$PYTHON_VERSION-$BASE_LAYER
   cache:
@@ -65,7 +71,8 @@ test-package:
         coverage_format: cobertura
         path: cov.xml
   rules:
-    - changes:
+    - if: $CI_COMMIT_BRANCH
+      changes:
         - src/softadapt/**/*
         - tests/**/*
 
@@ -90,7 +97,7 @@ deploy-docs:
     - git -C ${CI_PROJECT_NAME}.wiki add .
     - git -C ${CI_PROJECT_NAME}.wiki commit -am "Updated triggered from $CI_COMMIT_SHORT_SHA $CI_COMMIT_MESSAGE" && git -C ${CI_PROJECT_NAME}.wiki push origin master || true
   rules:
-    - if: $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE != "merge_request_event"      # Run for all changes to the default branch
+    - if: $CI_COMMIT_BRANCH == 'main' && $CI_PIPELINE_SOURCE != 'merge_request_event'      # Run for all changes to the default branch
 
 deploy-bump:
   stage: deploy
@@ -111,9 +118,8 @@ deploy-bump:
     - echo "#!/bin/sh" >> variables
     - echo "export TAG='$TAG'" >> variables
     - git push origin $TAG
-  only:
-    refs:
-      - main
+  rules:
+    - if: $CI_COMMIT_BRANCH == 'main' && $CI_PIPELINE_SOURCE != 'merge_request_event'
   artifacts:
     paths:
       - variables
@@ -139,9 +145,8 @@ deploy-bump-prerelease:
     - TAG=$(git describe --tags --abbrev=0)
     - echo "export TAG='$TAG'" >> variables
     - git push origin $TAG
-  only:
-    refs:
-      - dev
+  rules:
+    - if: $CI_COMMIT_BRANCH == 'dev' && $CI_PIPELINE_SOURCE != 'merge_request_event'
   artifacts:
     paths:
       - variables
@@ -171,7 +176,7 @@ deploy-bump-prerelease:
 
 deploy-to-pypi:
   stage: deploy
-  image: ghcr.io/astral-sh/uv:python$PYTHON_VERSION-$BASE_LAYER
+  image: ghcr.io/astral-sh/uv:python$PYTHON_VERSION-trixie
   dependencies:
     - build-package
   needs: [build-package, deploy-bump]
@@ -179,14 +184,14 @@ deploy-to-pypi:
   id_tokens:
     PYPI_ID_TOKEN:
       aud: pypi
+  before_script:
+    - git pull
   script:
     - uv publish
-  rules:
-    - if: $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE != 'merge_request_event'
 
 deploy-to-testpypi:
   stage: deploy
-  image: ghcr.io/astral-sh/uv:python$PYTHON_VERSION-$BASE_LAYER
+  image: ghcr.io/astral-sh/uv:python$PYTHON_VERSION-trixie
   dependencies:
     - build-package
   needs: [build-package, deploy-bump-prerelease]
@@ -194,11 +199,10 @@ deploy-to-testpypi:
   id_tokens:
     PYPI_ID_TOKEN:
       aud: testpypi
+  before_script:
+    - git pull
   script:
     - uv publish --index testpypi
-  only:
-    refs:
-      - dev
 
 # deploy-to-gitlab-releases:
 #   stage: deploy
