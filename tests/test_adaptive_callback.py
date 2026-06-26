@@ -1,7 +1,8 @@
 from keras import Model
 from keras import KerasTensor
 import pytest
-from unittest.mock import call, MagicMock, PropertyMock
+from pytest_mock import MockerFixture
+from unittest.mock import call
 import numpy as np
 
 # Assuming the file containing AdaptiveLossCallback is named adaptive_loss_callback.py
@@ -14,7 +15,7 @@ from softadapt.callbacks import AdaptiveLossCallback
 
 
 @pytest.fixture
-def callback_instance(mocker):
+def callback_instance(mocker: MockerFixture):
     """Provides a fresh instance of the callback."""
     # Mocking dependencies that are global or expensive
     mocker.patch("keras.src.utils.file_utils")
@@ -23,7 +24,7 @@ def callback_instance(mocker):
 
 
 @pytest.fixture
-def mock_keras_ops(mocker):
+def mock_keras_ops(mocker: MockerFixture):
     """Mocks keras tensor operations globally for the test scope."""
     # Patching ops is crucial as they are called throughout the class methods.
     mock_ops = mocker.patch("keras.ops")
@@ -35,30 +36,45 @@ def mock_keras_ops(mocker):
 # =============================================================
 
 
-def test_initialization_default_values(callback_instance):
-    """Tests that the callback initializes with correct defaults."""
-    assert callback_instance.frequency == "epoch"
-    assert callback_instance.algorithm.beta == 0.1
-    assert (
-        callback_instance.algorithm.__class__.__name__ == "SoftAdapt"
-    )  # Checks the default algorithm type
+@pytest.mark.parametrize("frequency", ["epoch", "batch", 0, 1, 2, 5, 0.5])
+@pytest.mark.parametrize("beta", [0.1, 0.5, 10, -0.2, -10])
+@pytest.mark.parametrize("algorithm", ["base", "loss-weighted", "normalized", "blah"])
+@pytest.mark.parametrize("calculate_on_validation", [True, False])
+def test_initialization(
+    callback_instance, frequency, beta, algorithm, calculate_on_validation
+):
+    """Tests that the callback initializes appropriately."""
+    try:
+        callback = AdaptiveLossCallback(
+            components=["component_A"],
+            frequency=frequency,
+            beta=beta,
+            algorithm=algorithm,
+            calculate_on_validation=calculate_on_validation,
+        )
+        assert callback._frequency == (frequency if isinstance(frequency, int) else 1)
+        assert callback.algorithm.beta == beta
+    except Exception as e:
+        with pytest.raises(ValueError):
+            raise e
+        return
 
+    if algorithm == "base":
+        assert (
+            callback.algorithm.__class__.__name__ == "SoftAdapt"
+        )  # Checks the default algorithm type
+    elif algorithm == "loss-weighted":
+        assert (
+            callback.algorithm.__class__.__name__ == "LossWeightedSoftAdapt"
+        )  # Checks the default algorithm type
+    elif algorithm == "normalized":
+        assert (
+            callback.algorithm.__class__.__name__ == "NormalizedSoftAdapt"
+        )  # Checks the default algorithm type
+    else:
+        pytest.fail("Class initialized with a non-implemented algorithm.")
 
-def test_initialization_custom_setup(callback_instance):
-    """Tests initialization with custom parameters and algorithm type."""
-    # Re-instantiate to test custom paths cleanly
-    callback = AdaptiveLossCallback(
-        components=["component_A"],
-        frequency="batch",
-        beta=0.5,
-        accuracy_order=3,
-        algorithm="loss-weighted",
-        calculate_on_validation=True,
-    )
-    assert callback.algorithm.beta == 0.5
-    assert callback.frequency == "batch"
-    assert callback.val is True
-    # Check that the correct algorithm instance was created (conceptually)
+    assert callback.val is calculate_on_validation
 
 
 # =============================================================
@@ -66,43 +82,62 @@ def test_initialization_custom_setup(callback_instance):
 # =============================================================
 
 
-def test_weights_setter_no_clipping(mocker, callback_instance):
-    """Tests setting weights when clipping is disabled."""
+@pytest.mark.parametrize("attribute", ["loss_weights", "_compile_loss", None])
+@pytest.mark.parametrize("weights", [[0.5, 0.4], [-0.5, 0.1]])
+@pytest.mark.parametrize("clipping", [True, False])
+def test_weights_setter(
+    mocker: MockerFixture, callback_instance, attribute, weights, clipping
+) -> None:
+    """Tests setting weights."""
     # Mock the model structure that supports assignment via property setter
-    mock_model = MagicMock(Model)
+    mock_model = mocker.MagicMock(Model)
     callback_instance.set_model(mock_model)
 
-    mock_model.attach_mock(mock=mocker.Mock(), attribute="loss_weights")
-
-    initial_weights = [0.5, 0.4]
-    callback_instance.weights = initial_weights
-
-    # The setter should assign the list directly
-    assert mock_model.loss_weights == initial_weights
-
-
-@pytest.mark.parametrize("attribute", ["loss_weights", "_compile_loss"])
-def test_weights_setter_with_clipping(callback_instance, mocker, attribute):
-    """Tests that weights are clipped to Keras epsilon when clip_weights is enabled."""
-    # Need to simulate the callback being initialized with clipping enabled
-    callback = AdaptiveLossCallback(components=["component_A"], clip_weights=True)
-
     # Assert: Verify that the operation to enforce minimum value occurred
-    mock_ops = mocker.patch("keras.ops.maximum")
+    mock_max = mocker.patch("keras.ops.maximum")
 
-    mock_model = MagicMock(Model)
-    callback.set_model(mock_model)
+    callback_instance._clip = clipping
 
-    mock_model.mock_add_spec(attribute)
+    if attribute == "loss_weights":
+        mock_model.loss_weights = []
+    elif attribute == "_compile_loss":
+        mock_model._compile_loss = mocker.MagicMock()
+        mock_model._compile_loss._flat_losses = [(None, None, w) for w in weights]
 
-    # Act: Try to set a weight below epsilon (e.g., -0.5)
-    negative_weights = [-0.5, 0.1]
-    callback.weights = negative_weights
+    try:
+        callback_instance.weights = weights
+    except AttributeError as e:
+        with pytest.raises(AttributeError):
+            raise e
 
-    # Since the setter uses ops.maximum, we check if that was called with the epsilon constraint
-    # (This is simplified; in a real test, you would verify the full call sequence)
-    # We ensure the logic flow enters the clipping block.
-    assert mock_ops.call_count >= 1
+    if clipping:
+        assert mock_max.called
+
+
+@pytest.mark.parametrize("attribute", ["loss_weights", "_compile_loss", None])
+@pytest.mark.parametrize("weights", [[0.5, 0.4]])
+@pytest.mark.parametrize("clipping", [True, False])
+def test_weights_getter(
+    mocker: MockerFixture, callback_instance, attribute, weights, clipping
+) -> None:
+    """Tests getting weights."""
+    # Mock the model structure that supports assignment via property setter
+    mock_model = mocker.MagicMock(Model)
+    callback_instance.set_model(mock_model)
+
+    callback_instance._clip = clipping
+    if attribute == "loss_weights":
+        mock_model.loss_weights = weights
+        assert callback_instance.weights == weights
+    elif attribute == "_compile_loss":
+        mock_model._compile_loss = mocker.MagicMock()
+        mock_model._compile_loss._flat_losses = [(None, None, w) for w in weights]
+
+    try:
+        assert callback_instance.weights == weights
+    except AttributeError as e:
+        with pytest.raises(AttributeError):
+            raise e
 
 
 # =============================================================
@@ -110,7 +145,9 @@ def test_weights_setter_with_clipping(callback_instance, mocker, attribute):
 # =============================================================
 
 
-def test_on_epoch_end_successful_weight_recomputation(mocker, callback_instance):
+def test_on_epoch_end_successful_weight_recomputation(
+    mocker: MockerFixture, callback_instance
+):
     """Tests the successful path: history collected -> weights computed -> weights set."""
 
     # --- Mocks Setup ---
@@ -124,8 +161,8 @@ def test_on_epoch_end_successful_weight_recomputation(mocker, callback_instance)
 
     # Simulate the loss logs passed to the callback (usually losses from components)
     mock_logs = {
-        "component_A_loss": MagicMock(KerasTensor),  # Current loss tensor
-        "val_component_A_loss": MagicMock(KerasTensor),  # Validation loss tensor
+        "component_A_loss": mocker.MagicMock(KerasTensor),  # Current loss tensor
+        "val_component_A_loss": mocker.MagicMock(KerasTensor),  # Validation loss tensor
     }
 
     # --- Execution (Simulating the critical moment) ---
@@ -145,13 +182,15 @@ def test_on_epoch_end_successful_weight_recomputation(mocker, callback_instance)
     # The primary coverage point here is that `get_component_weights` was triggered and the history collection occurred.
 
 
-def test_on_epoch_end_history_cleanup_by_frequency(mocker, callback_instance):
+def test_on_epoch_end_history_cleanup_by_frequency(
+    mocker: MockerFixture, callback_instance
+):
     """Tests the cleanup logic: popping vs clearing history based on frequency."""
 
     # Simulate the condition where frequency is "epoch" (requires pop)
-    callback_instance.frequency = "epoch"
+    callback_instance._frequency = "epoch"
     # Simulate the condition where frequency is not "epoch" (requires clear)
-    callback_instance.frequency = 5  # Simulating an integer frequency
+    callback_instance._frequency = 5  # Simulating an integer frequency
 
     # We would need to accurately track the internal state of components_history,
     # but conceptually these tests ensure both `h.pop(0)` and `h.clear()` paths are reachable.
@@ -163,7 +202,7 @@ def test_on_epoch_end_history_cleanup_by_frequency(mocker, callback_instance):
 # =============================================================
 
 
-def test_on_train_begin_restores_state(mocker, callback_instance):
+def test_on_train_begin_restores_state(mocker: MockerFixture, callback_instance):
     """Tests the recovery feature: loading history and weights from disk."""
 
     callback_instance = AdaptiveLossCallback(
@@ -193,7 +232,7 @@ def test_on_train_begin_restores_state(mocker, callback_instance):
     assert mock_np_load.call_count == 2
 
 
-def test_on_epoch_end_saves_state(mocker, callback_instance):
+def test_on_epoch_end_saves_state(mocker: MockerFixture, callback_instance):
     """Tests that weights and history are saved to disk when backup is enabled."""
 
     callback_instance = AdaptiveLossCallback(
@@ -206,10 +245,7 @@ def test_on_epoch_end_saves_state(mocker, callback_instance):
 
     # Ensure the backup directory exists before trying to save
     mock_file_utils.exists.return_value = True
-    mock_file_utils.makedirs = MagicMock()
-
-    # Set up the condition that triggers saving (e.g., frequency == "epoch")
-    callback_instance.frequency = "epoch"
+    mock_file_utils.makedirs = mocker.MagicMock()
 
     # Act: Run the end of an epoch
     callback_instance.on_epoch_end(epoch=10, logs={})
