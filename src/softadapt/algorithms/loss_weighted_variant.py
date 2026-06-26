@@ -30,14 +30,18 @@ class LossWeightedSoftAdapt(SoftAdaptBase):
     manuscript (located at: https://arxiv.org/pdf/1912.12355.pdf).
 
     Attributes:
-        beta: A float that is the 'beta' hyperparameter in our manuscript. If
-          beta > 0, then softAdapt will pay more attention the worst performing
-          loss component. If beta < 0, then SoftAdapt will assign higher weights
-          to the better performing components. Beta==0 is the trivial case and
-          all loss components will have coefficient 1.
+        epsilon: A float which is added to the denominator of a division for
+          numerical stability.
 
-        accuracy_order: An integer indicating the accuracy order of the finite
-          volume approximation of each loss component's slope.
+        beta (float, optional): A float that is the 'beta' hyperparameter in our manuscript. If
+            beta > 0, then softAdapt will pay more attention the worst performing
+            loss component. If beta < 0, then SoftAdapt will assign higher weights
+            to the better performing components. Beta==0 is the trivial case and
+            all loss components will have coefficient 1.
+        accuracy_order (int | None, optional): An integer indicating the accuracy order of the finite
+            volume approximation of each loss component's slope.
+            Passing "None" as the order of accuracy sets the highest possible
+            accuracy in the finite difference approximation.
     """
 
     def get_component_weights(

@@ -30,6 +30,9 @@ class NormalizedSoftAdapt(SoftAdaptBase):
     manuscript (located at: https://arxiv.org/pdf/1912.12355.pdf).
 
     Attributes:
+        epsilon: A float which is added to the denominator of a division for
+          numerical stability.
+
         beta (float, optional): A float that is the 'beta' hyperparameter in our manuscript. If
             beta > 0, then softAdapt will pay more attention the worst performing
             loss component. If beta < 0, then SoftAdapt will assign higher weights

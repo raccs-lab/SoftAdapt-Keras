@@ -23,19 +23,28 @@ from softadapt.utilities._finite_difference import _get_finite_difference
 
 
 class SoftAdaptBase:
-    """Base model for any of the SoftAdapt variants.
+    """Base class for any of the SoftAdapt variants.
 
     Attributes:
         epsilon: A float which is added to the denominator of a division for
           numerical stability.
 
+        beta (float, optional): A float that is the 'beta' hyperparameter in our manuscript. If
+            beta > 0, then softAdapt will pay more attention the worst performing
+            loss component. If beta < 0, then SoftAdapt will assign higher weights
+            to the better performing components. Beta==0 is the trivial case and
+            all loss components will have coefficient 1.
+        accuracy_order (int | None, optional): An integer indicating the accuracy order of the finite
+            volume approximation of each loss component's slope.
+            Passing "None" as the order of accuracy sets the highest possible
+            accuracy in the finite difference approximation.
     """
 
     epsilon: float
     beta: float
     accuracy_order: int | None
 
-    def __init__(self, beta=0.1, accuracy_order=None) -> None:
+    def __init__(self, beta: float = 0.1, accuracy_order: int | None = None) -> None:
         """Initializer of the base method."""
         self.epsilon = backend.epsilon()
         self.beta = beta
