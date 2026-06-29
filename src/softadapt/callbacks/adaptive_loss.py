@@ -160,7 +160,6 @@ class AdaptiveLossCallback(callbacks.Callback):
             if file_utils.exists(self._adaptive_loss_weights_path):
                 saved_weights = np.load(self._adaptive_loss_weights_path)
                 self.weights = ops.convert_to_tensor(saved_weights)
-        return super().on_train_begin(logs)
 
     def on_epoch_end(self, epoch: int, logs: dict | None = None) -> None:
         """Update component history in order for weight computation.
@@ -183,17 +182,11 @@ class AdaptiveLossCallback(callbacks.Callback):
 
         # If the set number of epochs or frequency is met than recompute loss weights
         if (
-            (
-                self._frequency == "epoch"
-                or (
-                    not isinstance(self._frequency, str)
-                    and epoch % self._frequency == 0
-                )
-            )
+            epoch % self._frequency == 0
             and epoch != 0
             and len(self._components_history[0]) > 1
         ):
-            adapt_weights = self.algorithm.get_component_weights(
+            adapt_weights: KerasTensor = self.algorithm.get_component_weights(
                 *ops.convert_to_tensor(self._components_history, dtype=K.floatx()),
                 verbose=self.debug,
             )
@@ -202,7 +195,7 @@ class AdaptiveLossCallback(callbacks.Callback):
 
             for h in self._components_history:
                 if (
-                    self._frequency == "epoch"
+                    self._frequency == 1
                 ):  # In the case of an epoch-wise evaluation, the most recent loss value is retained
                     h.pop(0)
                 else:
