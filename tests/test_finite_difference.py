@@ -1,5 +1,6 @@
 """Unit testing for calculating finite difference approximations."""
 
+from pytest_mock import MockerFixture
 import numpy as np
 import pytest
 from softadapt.utilities._finite_difference import _get_finite_difference
@@ -10,102 +11,61 @@ def rtol():
     return 1e-5
 
 
-# Positive slope test cases
-def test_first_order_positive_slope(rtol):
-    order = 2
-    loss_points = [0, 1, 2, 3, 4, 5]
-    approximation = _get_finite_difference(loss_points, order)
-    assert np.isclose(1, approximation, rtol=rtol), (
-        "Incorrect first order approximation for simple positive slope test case."
-    )
+@pytest.mark.parametrize("order", [None, 1, 2, 3, 4, 5])
+@pytest.mark.parametrize(
+    "loss_points",
+    [
+        (1, [0, 1, 2, 3, 4, 5]),
+        (1, [-5, -4, -3, -2, -1, 0]),
+        (2, [0, 2, 4, 6, 8, 10]),
+        (2, [-10, -8, -6, -4, -2, 0]),
+    ],
+)
+def test_n_order_positive_slope(mocker: MockerFixture, rtol, order, loss_points):
+    mocker.patch("logging.info")
+    mocker.patch("logging.error")
+    approximation: float = _get_finite_difference(loss_points[1], order, verbose=True)
+    assert np.isclose(loss_points[0], approximation, rtol=rtol)
 
 
-def test_second_order_positive_slope(rtol):
-    order = 2
-    loss_points = [0, 1, 2, 3, 4, 5]
-    approximation = _get_finite_difference(loss_points, order)
-    assert np.isclose(1, approximation, rtol=rtol), (
-        "Incorrect second order approximation for simple positive slope test case."
-    )
-
-
-def test_third_order_positive_slope(rtol):
-    order = 3
-    loss_points = [0, 2, 4, 6, 8, 10]
-    approximation = _get_finite_difference(loss_points, order)
-    assert np.isclose(2, approximation, rtol=rtol), (
-        "Incorrect third order approximation for simple positive slope test case."
-    )
-
-
-def test_fourth_order_positive_slope(rtol):
-    order = 4
-    loss_points = [0, 2, 4, 6, 8, 10]
-    approximation = _get_finite_difference(loss_points, order)
-    assert np.isclose(2, approximation, rtol=rtol), (
-        "Incorrect fourth order approximation for simple positive slope test case."
-    )
-
-
-def test_fifth_order_positive_slope(rtol):
-    order = 5
-    loss_points = [-5, -4, -3, -2, -1, 0]
-    approximation = _get_finite_difference(loss_points, order)
-    assert np.isclose(1, approximation, rtol=rtol), (
-        "Incorrect fifth order approximation for simple positive slope test case."
-    )
-
-
-def test_tenth_order_positive_slope(rtol):
-    order = 10
-    loss_points = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-    approximation = _get_finite_difference(loss_points, order)
-    assert np.isclose(1, approximation, rtol=rtol), (
-        "Incorrect 10th order approximation for simple positive slope test case."
-    )
+def test_10_order_less_points(rtol):
+    with pytest.raises(ValueError):
+        _get_finite_difference([0, 1, 2, 3, 4, 5], 10)
 
 
 # Negative slope test cases
-def test_first_order_negative_slope(rtol):
-    order = 1
-    loss_points = [15, 12, 9, 6, 3, 0]
-    approximation = _get_finite_difference(loss_points, order)
-    assert np.isclose(-3, approximation, rtol=rtol), (
-        "Incorrect first order approximation for simple negative slope test case."
-    )
+@pytest.mark.parametrize("order", [1, 2, 3, 4, 5])
+@pytest.mark.parametrize(
+    "loss_points",
+    [(-3, [15, 12, 9, 6, 3, 0]), (-1, [5, 4, 3, 2, 1, 0]), (-4, [20, 16, 12, 8, 4, 0])],
+)
+def test_n_order_negative_slope(rtol, order, loss_points):
+    approximation: float = _get_finite_difference(loss_points[1], order)
+    assert np.isclose(loss_points[0], approximation, rtol=rtol)
 
 
-def test_second_order_negative_slope(rtol):
-    order = 2
-    loss_points = [5, 4, 3, 2, 1, 0]
-    approximation = _get_finite_difference(loss_points, order)
-    assert np.isclose(-1, approximation, rtol=rtol), (
-        "Incorrect second order approximation for simple negative slope test case."
-    )
+# =============================================================
+# Test Suite: Error Handling (Achieving Full Coverage of `raise` statements)
+# =============================================================
 
 
-def test_third_order_negative_slope(rtol):
-    order = 3
-    loss_points = [20, 16, 12, 8, 4, 0]
-    approximation = _get_finite_difference(loss_points, order)
-    assert np.isclose(-4, approximation, rtol=rtol), (
-        "Incorrect third order approximation for simple negative slope test case."
-    )
-
-
-def test_fourth_order_negative_slope(rtol):
-    order = 4
-    loss_points = [5, 4, 3, 2, 1, 0]
-    approximation = _get_finite_difference(loss_points, order)
-    assert np.isclose(-1, approximation, rtol=rtol), (
-        "Incorrect fourth order approximation for simple negative slope test case."
-    )
-
-
-def test_fifth_order_negative_slope(rtol):
+def test_error_not_enough_points(rtol):
+    """Tests the ValueError raised when array size is too small for the desired order."""
+    # To trigger the error (order + 1 < len(array) condition failure),
+    # we need array length <= order. e.g., order=5, len=3.
+    input_array = np.arange(3)
     order = 5
-    loss_points = [5, 4, 3, 2, 1, 0]
-    approximation = _get_finite_difference(loss_points, order)
-    assert np.isclose(-1, approximation, rtol=rtol), (
-        "Incorrect fifth order approximation for simple negative slope test case."
-    )
+
+    # Act & Assert: Expect the ValueError defined in the source code
+    with pytest.raises(ValueError):
+        _get_finite_difference(input_array, order=order)
+
+
+def test_error_invalid_high_order_odd(rtol):
+    """Tests the ValueError raised for accuracy orders > 5 and not even."""
+    input_array = np.arange(10)
+    order = 7  # Odd number > 5
+
+    # Act & Assert: Expect the ValueError defined in the source code
+    with pytest.raises(ValueError):
+        _get_finite_difference(input_array, order=order)

@@ -70,7 +70,7 @@ def _get_finite_difference(
     if order is None:
         order = len(input_array) - 1
         if verbose:
-            log_msg: str = f"Interpreting finite difference order as {order} sinceno explicit order was specified."
+            log_msg: str = f"Interpreting finite difference order as {order} since no explicit order was specified."
             logging.info(msg=log_msg)
     elif order > len(input_array):
         error_msg = (
