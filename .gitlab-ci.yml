@@ -121,7 +121,7 @@ deploy-to-pypi:
     - uv pip install --system "git+https://github.com/astral-sh/uv" # TODO: Remove after docker container updated with fix
     - git config --global user.email "${GITLAB_USER_EMAIL}" && git config --global user.name "${GITLAB_USER_NAME}"
     - git fetch origin main
-    - git reset --hard origin/main
+    - git checkout -B main
     - git fetch --tags
   script:
     - uvx --from commitizen cz bump --no-verify --yes || exit $?
@@ -152,13 +152,12 @@ deploy-to-testpypi:
     - uv pip install --system "git+https://github.com/astral-sh/uv" # TODO: Remove after docker container updated with fix
     - git config --global user.email "${GITLAB_USER_EMAIL}" && git config --global user.name "${GITLAB_USER_NAME}"
     - git fetch origin dev
-    - git reset --hard origin/dev
+    - git checkout -B dev
     - git fetch --tags
   script:
-    - uvx --from commitizen cz bump --no-verify -pr rc --yes || exit $?
+    - uvx --from commitizen cz bump --no-verify -pr rc --yes --allow-no-commit || exit $?
     - uv build
     - uv publish --index testpypi
-    - git checkout -b dev
     - git push origin dev:$CI_COMMIT_REF_NAME
     - echo "#!/bin/sh" >> variables
     - TAG=$(git describe --tags --abbrev=0)
