@@ -133,7 +133,7 @@ deploy-to-pypi:
     - echo "export TAG='$TAG'" >> variables
     - git push origin $TAG
   rules:
-    - if: $CI_COMMIT_BRANCH == 'main' && $CI_PIPELINE_SOURCE != 'merge_request_event'      # Run for all changes to the default branch
+    - if: $CI_COMMIT_BRANCH == 'main'      # Run for all changes to the default branch
   artifacts:
     paths:
       - variables
@@ -187,7 +187,7 @@ build-docs:
       - docs/**/*.md
     expire_in: 1 week
   rules:
-    - if: $CI_COMMIT_BRANCH == 'main' && $CI_PIPELINE_SOURCE != 'merge_request_event'      # Run for all changes to the default branch
+    - if: $CI_COMMIT_BRANCH == 'main'      # Run for all changes to the default branch
 
 deploy-docs:
   stage: deploy
@@ -207,7 +207,7 @@ deploy-docs:
     - git -C ${CI_PROJECT_NAME}.wiki add .
     - git -C ${CI_PROJECT_NAME}.wiki commit -am "Updated triggered from $CI_COMMIT_SHORT_SHA $CI_COMMIT_MESSAGE" && git -C ${CI_PROJECT_NAME}.wiki push origin master || true
   rules:
-    - if: $CI_COMMIT_BRANCH == 'main' && $CI_PIPELINE_SOURCE != 'merge_request_event'      # Run for all changes to the default branch
+    - if: $CI_COMMIT_BRANCH == 'main'     # Run for all changes to the default branch
 
 # deploy-to-gitlab-releases:
 #   stage: deploy
