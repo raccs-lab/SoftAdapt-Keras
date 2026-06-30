@@ -1,3 +1,19 @@
+## v0.2.0rc0 (2026-06-30)
+
+### BREAKING CHANGE
+
+- Ref #16
+
+### Fix
+
+- **AdaptiveLossCallback**: replace logic that relies on recognizing epoch frequency
+- **AdaptiveLossCallback**: several changes throughout to make callback more robust
+
+### Refactor
+
+- **SoftAdaptBase**: remove explicit use of beta in _softmax and use class attribute instead
+- **LossWeightedSoftAdapt**: remove duplicate init function
+
 ## v0.1.4 (2026-06-23)
 
 ## v0.1.3 (2025-12-02)

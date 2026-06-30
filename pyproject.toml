@@ -4,7 +4,7 @@ authors = [
     { name = "A. Ali Heydari", email = "aliheydari@ucdavis.edu" },
     { name = "Jacob Logas", email = "jacob.logas@fandm.edu" },
 ]
-version = "0.1.4"
+version = "0.2.0rc0"
 maintainers = [{ name = "Jacob Logas", email = "jacob.logas@fandm.edu" }]
 description = "SoftAdapt: Techniques for Adaptive Loss Weighting of Neural Networks with Multi-Part Loss Functions implemented in Keras"
 readme = "README.md"
@@ -43,6 +43,11 @@ name = "testpypi"
 url = "https://test.pypi.org/simple/"
 publish-url = "https://test.pypi.org/legacy/"
 explicit=true
+
+[[tool.uv.index]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [tool.pytest.ini_options]
 filterwarnings = [

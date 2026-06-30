@@ -158,6 +158,7 @@ deploy-to-testpypi:
     - uvx --from commitizen cz bump --no-verify -pr rc --yes || exit $?
     - uv build
     - uv publish --index testpypi
+    - git checkout -b dev
     - git push origin dev:$CI_COMMIT_REF_NAME
     - echo "#!/bin/sh" >> variables
     - TAG=$(git describe --tags --abbrev=0)
