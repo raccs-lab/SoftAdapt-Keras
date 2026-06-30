@@ -121,6 +121,7 @@ deploy-to-pypi:
     - git config --global user.email "${GITLAB_USER_EMAIL}" && git config --global user.name "${GITLAB_USER_NAME}"
     - git fetch origin main
     - git reset --hard origin/main
+    - git fetch --tags
   script:
     - uvx --from commitizen cz bump --no-verify --yes || exit $?
     - uv build
@@ -150,6 +151,7 @@ deploy-to-testpypi:
     - git config --global user.email "${GITLAB_USER_EMAIL}" && git config --global user.name "${GITLAB_USER_NAME}"
     - git fetch origin dev
     - git reset --hard origin/dev
+    - git fetch --tags
   script:
     - uvx --from commitizen cz bump --no-verify -pr rc --yes || exit $?
     - uv build
