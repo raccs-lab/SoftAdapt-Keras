@@ -113,7 +113,7 @@ test-package:
 
 deploy-to-pypi:
   stage: deploy
-  environment: release
+  environment: production
   id_tokens:
     PYPI_ID_TOKEN:
       aud: pypi
