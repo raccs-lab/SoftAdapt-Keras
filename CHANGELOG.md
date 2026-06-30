@@ -1,3 +1,9 @@
+## v0.2.0rc2 (2026-06-30)
+
+### Fix
+
+- **pyproject.toml**: remove recurring duplicate pytorch index
+
 ## v0.2.0rc1 (2026-06-30)
 
 ## v0.2.0rc0 (2026-06-30)
