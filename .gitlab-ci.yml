@@ -122,7 +122,7 @@ deploy-to-pypi:
     - git fetch origin main
     - git reset --hard origin/main
   script:
-    - uvx --from commitizen cz bump --no-verify || exit $?
+    - uvx --from commitizen cz bump --no-verify --yes || exit $?
     - uv build
     - uv publish
     - git push origin main:$CI_COMMIT_REF_NAME
@@ -151,7 +151,7 @@ deploy-to-testpypi:
     - git fetch origin dev
     - git reset --hard origin/dev
   script:
-    - uvx --from commitizen cz bump --no-verify -pr rc || exit $?
+    - uvx --from commitizen cz bump --no-verify -pr rc --yes || exit $?
     - uv build
     - uv publish --index testpypi
     - git push origin dev:$CI_COMMIT_REF_NAME
