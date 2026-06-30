@@ -1,5 +1,4 @@
 from keras import Model
-from keras import KerasTensor
 import pytest
 from pytest_mock import MockerFixture
 import numpy as np
@@ -151,19 +150,35 @@ def test_on_epoch_end_successful_weight_recomputation(
 ):
     """Tests the successful path: history collected -> weights computed -> weights set."""
 
+    callback_instance = AdaptiveLossCallback(components=["A", "B"])
+
+    # Mock the model structure that supports assignment via property setter
+    mock_model = mocker.MagicMock(Model)
+    callback_instance.set_model(mock_model)
+
+    mock_model.loss_weights = []
+
     # --- Mocks Setup ---
     # Mock the dependency on the underlying algorithm to control its output
     mock_algorithm = mocker.patch.object(
         callback_instance.algorithm, "get_component_weights"
     )
 
+    # Setup: We need a list structure
+    for c in ["A", "B"]:
+        callback_instance._components_history[
+            callback_instance.order.index(c + "_loss")
+        ] = [mocker.MagicMock(), mocker.MagicMock()]
+
+    mocker.patch("keras.ops.copy")
+
     # Simulate the successful computation of new weights (the result of get_component_weights)
     mock_algorithm.return_value = np.array([0.8, 0.2])
 
     # Simulate the loss logs passed to the callback (usually losses from components)
     mock_logs = {
-        "component_A_loss": mocker.MagicMock(KerasTensor),  # Current loss tensor
-        "val_component_A_loss": mocker.MagicMock(KerasTensor),  # Validation loss tensor
+        "A_loss": mocker.MagicMock(),  # Current loss tensor
+        "B_loss": mocker.MagicMock(),  # Validation loss tensor
     }
 
     # --- Execution (Simulating the critical moment) ---
@@ -194,6 +209,11 @@ def test_on_train_begin_restores_state(mocker: MockerFixture, callback_instance)
     callback_instance = AdaptiveLossCallback(
         components=["component_A"], frequency="epoch", backup_dir="."
     )
+
+    # Mock the model structure that supports assignment via property setter
+    mock_model = mocker.MagicMock(Model)
+    callback_instance.set_model(mock_model)
+    mock_model.loss_weights = []
 
     # --- Mocks Setup ---
     mock_exists = mocker.patch("keras.src.utils.file_utils.exists")
@@ -338,26 +358,38 @@ def test_on_epoch_end_loss_collected_training_mode(
 def test_on_epoch_end_history_cleanup_epoch(mocker: MockerFixture, callback_instance):
     """Tests the cleanup path for 'epoch' frequency (pop oldest item)."""
 
+    callback_instance = AdaptiveLossCallback(components=["A", "B"], frequency="epoch")
+
     # Setup: We need a list structure to test the `h.pop(0)` action
-    callback_instance.components_history = [["loss1", "loss2"]]
+    for c in ["A", "B"]:
+        callback_instance._components_history[
+            callback_instance.order.index(c + "_loss")
+        ] = [mocker.MagicMock()]
+
     mocker.patch("keras.ops.convert_to_numpy")  # Mock conversion for safety
 
     # Act: Run the function
     callback_instance.on_epoch_end(epoch=5, logs={})
 
     # Assert: Verify the history buffer size decreased by one (successful pop)
-    assert len(callback_instance.components_history[0]) == 1
+    assert len(callback_instance._components_history[0]) == 1
 
 
 def test_on_epoch_end_history_cleanup_batch(mocker: MockerFixture, callback_instance):
     """Tests the cleanup path for non-'epoch' frequency (clear buffer)."""
 
+    callback_instance = AdaptiveLossCallback(components=["A", "B"], frequency=3)
+
     # Setup: We need a list structure
-    callback_instance.components_history = [["loss1", "loss2"]]
+    for c in ["A", "B"]:
+        callback_instance._components_history[
+            callback_instance.order.index(c + "_loss")
+        ] = [mocker.MagicMock(), mocker.MagicMock()]
+
+    mocker.patch("keras.ops.convert_to_numpy")  # Mock conversion for safety
 
     # Act: Run the function with non-'epoch' frequency
-    callback_instance.frequency = 3  # Simulating batch/integer frequency
-    callback_instance.on_epoch_end(epoch=5, logs={})
+    callback_instance.on_epoch_end(epoch=3, logs={})
 
     # Assert: Verify the history buffer was completely cleared
-    assert len(callback_instance.components_history[0]) == 0
+    assert len(callback_instance._components_history[0]) == 0

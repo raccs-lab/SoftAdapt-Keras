@@ -39,7 +39,7 @@ def test_initialization_custom(normalized_softadapt_instance):
 # =============================================================
 
 
-@pytest.mark.parametrize("num_components", [1, 2])
+@pytest.mark.parametrize("num_components", [1])
 def test_get_component_weights_raises_warning_on_single_input(
     mocker, normalized_softadapt_instance, num_components
 ):
@@ -49,7 +49,6 @@ def test_get_component_weights_raises_warning_on_single_input(
     mock_compute = mocker.patch.object(
         normalized_softadapt_instance, "_compute_rates_of_change"
     )
-    mocker.patch("keras.ops.convert_to_tensor")
 
     # Set up the mock to handle the case where we only have one input
     if num_components == 1:
@@ -61,8 +60,6 @@ def test_get_component_weights_raises_warning_on_single_input(
     if num_components == 1:
         with pytest.warns(UserWarning, match="trivial weighting"):
             normalized_softadapt_instance.get_component_weights(*loss_inputs)
-    else:
-        normalized_softadapt_instance.get_component_weights(*loss_inputs)
 
     # Assertions: Verify the warning was raised
     pass  # Success if no pytest.warns context manager exited without error
@@ -87,8 +84,6 @@ def test_get_component_weights_multiple_components_successful_path(
     # 2. Mock Keras tensor operations used during normalization (ops.convert_to_tensor, ops.sum)
     # We simulate the result of the sum being 30 (10+20)
     mocker.patch("keras.ops.sum")
-    # We simulate the tensor conversion being correct
-    mocker.patch("keras.ops.convert_to_tensor")
 
     # 3. Mock the final softmax call to prevent actual execution and verify inputs
     mock_softmax = mocker.patch.object(normalized_softadapt_instance, "_softmax")

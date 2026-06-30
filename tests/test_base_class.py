@@ -1,3 +1,4 @@
+from pytest_mock import MockFixture
 import pytest
 import numpy as np
 from unittest.mock import MagicMock
@@ -81,12 +82,11 @@ def test_softmax_branching(mocker, softadapt_instance, shift, weights_present):
     if shift:
         softadapt_instance._softmax(
             input_tensor,
-            beta=1.0,
             numerator_weights=numerator_weights,
             shift_by_max_value=True,
         )
     else:
-        softadapt_instance._softmax(input_tensor, beta=1.0, shift_by_max_value=False)
+        softadapt_instance._softmax(input_tensor, shift_by_max_value=False)
 
     # --- Assertions based on scenario ---
 
@@ -135,7 +135,9 @@ def test_compute_rates_of_change_delegates_correctly(mocker, softadapt_instance)
     )
 
 
-def test_compute_rates_of_change_uses_default_order(mocker, softadapt_instance):
+def test_compute_rates_of_change_uses_default_order(
+    mocker: MockFixture, softadapt_instance
+):
     """Tests that the function defaults to order=5 if no order is passed."""
 
     mock_convert = mocker.patch("keras.ops.convert_to_numpy")
@@ -153,5 +155,5 @@ def test_compute_rates_of_change_uses_default_order(mocker, softadapt_instance):
     mock_get_finite_difference.assert_called_once()
     # Check the arguments passed to _get_finite_difference (order is the second positional argument)
     # The positional arguments match: input_array, order=5, verbose=True
-    call_args = mock_get_finite_difference.call_args[0]
-    assert call_args[1] == 5
+    call_args = mock_get_finite_difference.call_args[1]
+    assert call_args["order"] == 5
