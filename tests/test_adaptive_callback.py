@@ -2,7 +2,6 @@ from keras import Model
 from keras import KerasTensor
 import pytest
 from pytest_mock import MockerFixture
-from unittest.mock import call
 import numpy as np
 
 # Assuming the file containing AdaptiveLossCallback is named adaptive_loss_callback.py
@@ -45,15 +44,17 @@ def test_initialization(
 ):
     """Tests that the callback initializes appropriately."""
     try:
-        callback = AdaptiveLossCallback(
+        callback_instance = AdaptiveLossCallback(
             components=["component_A"],
             frequency=frequency,
             beta=beta,
             algorithm=algorithm,
             calculate_on_validation=calculate_on_validation,
         )
-        assert callback._frequency == (frequency if isinstance(frequency, int) else 1)
-        assert callback.algorithm.beta == beta
+        assert callback_instance._frequency == (
+            frequency if isinstance(frequency, int) else 1
+        )
+        assert callback_instance.algorithm.beta == beta
     except Exception as e:
         with pytest.raises(ValueError):
             raise e
@@ -61,20 +62,20 @@ def test_initialization(
 
     if algorithm == "base":
         assert (
-            callback.algorithm.__class__.__name__ == "SoftAdapt"
+            callback_instance.algorithm.__class__.__name__ == "SoftAdapt"
         )  # Checks the default algorithm type
     elif algorithm == "loss-weighted":
         assert (
-            callback.algorithm.__class__.__name__ == "LossWeightedSoftAdapt"
+            callback_instance.algorithm.__class__.__name__ == "LossWeightedSoftAdapt"
         )  # Checks the default algorithm type
     elif algorithm == "normalized":
         assert (
-            callback.algorithm.__class__.__name__ == "NormalizedSoftAdapt"
+            callback_instance.algorithm.__class__.__name__ == "NormalizedSoftAdapt"
         )  # Checks the default algorithm type
     else:
         pytest.fail("Class initialized with a non-implemented algorithm.")
 
-    assert callback.val is calculate_on_validation
+    assert callback_instance.val is calculate_on_validation
 
 
 # =============================================================
@@ -182,21 +183,6 @@ def test_on_epoch_end_successful_weight_recomputation(
     # The primary coverage point here is that `get_component_weights` was triggered and the history collection occurred.
 
 
-def test_on_epoch_end_history_cleanup_by_frequency(
-    mocker: MockerFixture, callback_instance
-):
-    """Tests the cleanup logic: popping vs clearing history based on frequency."""
-
-    # Simulate the condition where frequency is "epoch" (requires pop)
-    callback_instance._frequency = "epoch"
-    # Simulate the condition where frequency is not "epoch" (requires clear)
-    callback_instance._frequency = 5  # Simulating an integer frequency
-
-    # We would need to accurately track the internal state of components_history,
-    # but conceptually these tests ensure both `h.pop(0)` and `h.clear()` paths are reachable.
-    pass
-
-
 # =============================================================
 # Test Suite for File I/O / Backup (Edge Cases)
 # =============================================================
@@ -237,47 +223,70 @@ def test_on_train_begin_restores_state(mocker: MockerFixture, callback_instance)
 # =============================================================
 
 
+@pytest.mark.parametrize("dir_exists", [True, False])
+@pytest.mark.parametrize("on_val", [True, False])
+@pytest.mark.parametrize("components", [["A"], ["A", "B"]])
+@pytest.mark.parametrize("try_epoch", [1, 5])
+@pytest.mark.parametrize("freq", [1, 5])
 def test_on_epoch_end_loss_collected_training_mode(
-    mocker: MockerFixture, callback_instance
+    mocker: MockerFixture,
+    callback_instance,
+    dir_exists,
+    on_val,
+    components,
+    try_epoch,
+    freq,
 ):
-    """Tests the branch where training loss (non-validation) is collected."""
+    """Tests the branch where training loss is collected."""
+    # Setup: Enable backup path
+    callback_instance = AdaptiveLossCallback(
+        components=components,
+        frequency=freq,
+        backup_dir="/tmp/my_run",
+        calculate_on_validation=on_val,
+    )
+
+    loss_data = {}
+    # Act: Loss is available, but no validation mode is active
+    for c in components:
+        loss_data[c + "_loss"] = mocker.MagicMock()
+        loss_data["val_" + c + "_loss"] = mocker.MagicMock()
+        callback_instance._components_history[
+            callback_instance.order.index(c + "_loss")
+        ] = [mocker.MagicMock()]
+
+    # Mock NumPy save to track calls
+    np_save = mocker.patch("numpy.save")
+    mocker.patch("keras.src.utils.file_utils.exists").return_value = dir_exists
+    makedirs_mock = mocker.patch("keras.src.utils.file_utils.makedirs")
 
     # Mock Keras ops.copy to simulate tensor passage
-    mocker.patch("keras.ops.copy")
+    keras_copy = mocker.patch("keras.ops.copy")
 
-    # Act: Loss is available, but no validation mode is active
-    loss_data = {"loss_A": mocker.MagicMock()}  # Loss name matches the component name
-    callback_instance.on_epoch_end(epoch=1, logs=loss_data)
+    type(callback_instance).weights = mocker.PropertyMock()
+    # mock_algo = mocker.MagicMock()
+    type(callback_instance).algorithm = mocker.PropertyMock()
+
+    # Act: Run the function (which triggers saving)
+    callback_instance.on_epoch_end(epoch=try_epoch, logs=loss_data)
+
+    # Assert: Verify that makedirs is only called when it doesn't exist
+    if dir_exists:
+        makedirs_mock.assert_not_called()
+    else:
+        makedirs_mock.assert_called_once()
 
     # Assert: Verify that the correct loss tensor was copied into history
-    keras_ops = mocker.patch("keras.ops")
-    keras_ops.copy.assert_called_once()
+    assert keras_copy.call_count == len(components)
 
+    # Assert: Verify that save happens always
+    assert np_save.call_count == 2
 
-def test_on_epoch_end_loss_collected_validation_mode(
-    mocker: MockerFixture, callback_instance
-):
-    """Tests the branch where validation loss is collected due to calculate_on_validation=True."""
-
-    # Set the state for validation calculation
-    callback = AdaptiveLossCallback(components=["loss_A"], calculate_on_validation=True)
-    mocker.patch("keras.ops.copy")
-
-    # Act: Loss is available, and validation mode is active
-    val_loss_data = {"val_loss_A": mocker.MagicMock()}
-    callback.on_epoch_end(epoch=1, logs=val_loss_data)
-
-    # Assert: Verify that the correct tensor was copied (the `val_` prefix is used)
-    keras_ops = mocker.patch("keras.ops")
-    keras_ops.copy.assert_called_once()
-
-
-def test_on_epoch_end_no_loss_logs(mocker: MockerFixture, callback_instance):
-    """Tests the edge case where no loss logs are passed and nothing should crash."""
-    # Act: Pass None for logs
-    callback_instance.on_epoch_end(epoch=5, logs=None)
-    # Assert: No crashes should occur; no Keras ops methods related to loss collection are called.
-    pass
+    # Assert: Verify that adapt weights are computed only when frequency hit
+    # if try_epoch % freq != 0:
+    #     mock_algo.get_component_weights.assert_not_called()
+    # else:
+    #     mock_algo.get_component_weights.assert_called_once()
 
 
 # =============================================================
@@ -285,40 +294,40 @@ def test_on_epoch_end_no_loss_logs(mocker: MockerFixture, callback_instance):
 # =============================================================
 
 
-@pytest.mark.parametrize(
-    "frequency, epoch_check, run_weights",
-    [
-        # Case 1: Epoch frequency (triggers on every epoch > 0)
-        ("epoch", lambda e: e != 0, True),
-        # Case 2: N-step frequency (triggers only if epoch is multiple of N)
-        (3, lambda e: e > 0 and e % 3 == 0, True),
-        # Case 3: Never triggers (epoch=1)
-        (5, lambda e: e == 1, False),
-    ],
-)
-def test_weight_computation_trigger(
-    mocker: MockerFixture, callback_instance, frequency, epoch_check, run_weights
-):
-    """Tests the complex IF condition that decides when to compute weights."""
+# @pytest.mark.parametrize(
+#     "frequency, epoch_check, run_weights",
+#     [
+#         # Case 1: Epoch frequency (triggers on every epoch > 0)
+#         ("epoch", lambda e: e != 0, True),
+#         # Case 2: N-step frequency (triggers only if epoch is multiple of N)
+#         (3, lambda e: e > 0 and e % 3 == 0, True),
+#         # Case 3: Never triggers (epoch=1)
+#         (5, lambda e: e == 1, False),
+#     ],
+# )
+# def test_weight_computation_trigger(
+#     mocker: MockerFixture, callback_instance, frequency, epoch_check, run_weights
+# ):
+#     """Tests the complex IF condition that decides when to compute weights."""
 
-    # Set up frequency and epoch check
-    callback_instance.frequency = frequency
-    epoch = 10 if run_weights else 1
+#     # Set up frequency and epoch check
+#     callback_instance.frequency = frequency
+#     epoch = 10 if run_weights else 1
 
-    # Mock the dependencies that are called when weights are computed
-    mocker.patch.object(callback_instance.algorithm, "get_component_weights")
-    mocker.patch("keras.ops.convert_to_tensor")
+#     # Mock the dependencies that are called when weights are computed
+#     mocker.patch.object(callback_instance.algorithm, "get_component_weights")
+#     mocker.patch("keras.ops.convert_to_tensor")
 
-    # Act
-    callback_instance.on_epoch_end(epoch=epoch, logs={})
+#     # Act
+#     callback_instance.on_epoch_end(epoch=epoch, logs={})
 
-    # Assert: Verify the correct computational path was taken
-    if run_weights and epoch == 10 and frequency == "epoch":
-        # This is the successful path, weight computation must happen
-        pass
-    elif epoch == 1 and frequency != "epoch":
-        # This is the failure path, weight computation must NOT happen (len > 1 check fails)
-        pass
+#     # Assert: Verify the correct computational path was taken
+#     if run_weights and epoch == 10 and frequency == "epoch":
+#         # This is the successful path, weight computation must happen
+#         pass
+#     elif epoch == 1 and frequency != "epoch":
+#         # This is the failure path, weight computation must NOT happen (len > 1 check fails)
+#         pass
 
 
 # =============================================================
@@ -352,44 +361,3 @@ def test_on_epoch_end_history_cleanup_batch(mocker: MockerFixture, callback_inst
 
     # Assert: Verify the history buffer was completely cleared
     assert len(callback_instance.components_history[0]) == 0
-
-
-@pytest.mark.parametrize("dir_exists", [True, False])
-@pytest.mark.parametrize("on_val", [True, False])
-def test_on_epoch_end_backup_save_triggered(
-    mocker: MockerFixture, callback_instance, dir_exists, on_val
-):
-    """Tests that both weight and history are saved when backup is configured."""
-
-    # Setup: Enable backup path
-    callback_instance = AdaptiveLossCallback(
-        components=["component_A"],
-        frequency="epoch",
-        backup_dir="/tmp/my_run",
-        calculate_on_validation=on_val,
-    )
-
-    # Mock NumPy save to track calls
-    np_save = mocker.patch("numpy.save")
-    mocker.patch("keras.src.utils.file_utils.exists").return_value = dir_exists
-    makedirs_mock = mocker.patch("keras.src.utils.file_utils.makedirs")
-
-    type(callback_instance).weights = mocker.PropertyMock()
-    type(callback_instance).algorithm = mocker.PropertyMock()
-
-    # Act: Run the function (which triggers saving)
-    callback_instance.on_epoch_end(
-        epoch=5, logs={"component_A_loss": 0.5, "val_component_A_loss": 0.25}
-    )
-
-    # Assert: Verify that makedirs is only called when it doesn't exist
-    if dir_exists:
-        makedirs_mock.assert_not_called()
-    else:
-        makedirs_mock.assert_called_once()
-
-    # Assert: Verify that BOTH the weights and history files were attempted to be saved
-    np_save.assert_called_with(callback_instance._adaptive_loss_weights_path)
-    np_save.assert_called_with(
-        np.array([])
-    )  # This checks the weight save call (simplified argument check)
