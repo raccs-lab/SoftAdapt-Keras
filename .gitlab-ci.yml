@@ -146,7 +146,7 @@ deploy-to-testpypi:
   stage: deploy
   environment: release
   id_tokens:
-    PYPI_ID_TOKEN:
+    TESTPYPI_ID_TOKEN:
       aud: testpypi
   before_script:
     - uv pip install --system "git+https://github.com/astral-sh/uv" # TODO: Remove after docker container updated with fix
