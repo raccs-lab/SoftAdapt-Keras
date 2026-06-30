@@ -84,4 +84,4 @@ class SoftAdapt(SoftAdaptBase):
             rates_of_change, dtype=backend.floatx()
         )
         # Calculate the weight and return the values.
-        return self._softmax(input_tensor=rates_of_change_t, beta=self.beta)
+        return self._softmax(input_tensor=rates_of_change_t)

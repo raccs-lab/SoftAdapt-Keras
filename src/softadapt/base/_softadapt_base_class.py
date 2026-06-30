@@ -61,7 +61,6 @@ class SoftAdaptBase:
     def _softmax(
         self,
         input_tensor: KerasTensor,
-        beta: float = 1,
         numerator_weights: KerasTensor | None = None,
         *,
         shift_by_max_value: bool = True,
@@ -71,8 +70,6 @@ class SoftAdaptBase:
         Args:
             input_tensor: A tensor of floats which will be used for computing
               the (modified) softmax function.
-            beta: A float which is the scaling factor (as described in the
-              manuscript).
             numerator_weights: A tensor of weights which are the actual value of
               of the loss components. This option is used for the
               "loss-weighted" variant of SoftAdapt.
@@ -87,9 +84,9 @@ class SoftAdaptBase:
 
         """
         if shift_by_max_value:
-            exp_of_input = ops.exp(beta * (input_tensor - ops.max(input_tensor)))
+            exp_of_input = ops.exp(self.beta * (input_tensor - ops.max(input_tensor)))
         else:
-            exp_of_input = ops.exp(beta * input_tensor)
+            exp_of_input = ops.exp(self.beta * input_tensor)
 
         # This option will be used for the "loss-weighted" variant of SoftAdapt.
         if numerator_weights is not None:

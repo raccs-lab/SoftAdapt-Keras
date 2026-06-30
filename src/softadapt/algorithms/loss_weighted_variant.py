@@ -95,6 +95,5 @@ class LossWeightedSoftAdapt(SoftAdaptBase):
         # Calculate the weight and return the values.
         return self._softmax(
             input_tensor=rates_of_change,
-            beta=self.beta,
             numerator_weights=average_loss_values,
         )
