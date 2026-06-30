@@ -155,7 +155,7 @@ deploy-to-testpypi:
     - git checkout -B dev
     - git fetch --tags
   script:
-    - uvx --from commitizen cz bump --no-verify -pr rc --yes --allow-no-commit || exit $?
+    - uvx --from commitizen cz bump --no-verify -pr rc --yes || exit $?
     - uv build
     - uv publish --index testpypi
     - git push origin dev:$CI_COMMIT_REF_NAME
